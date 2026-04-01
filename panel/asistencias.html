@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencias - Gym Style Life</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Módulo de Asistencias</h1>
+        <p>Registro y listado de ingresos</p>
+        <a class="btn-volver" href="index.html">Volver al inicio</a>
+    </header>
+
+    <main class="container">
+        <section class="form-section">
+            <h2>Registrar asistencia</h2>
+            <form id="asistenciaForm">
+                <div class="grid">
+                    <input type="number" id="cliente_id" placeholder="ID Cliente" required>
+                    <input type="text" id="metodo_ingreso" placeholder="Método de ingreso" value="MANUAL" required>
+                </div>
+
+                <textarea id="observaciones" placeholder="Observaciones"></textarea>
+
+                <button type="submit">Guardar asistencia</button>
+            </form>
+
+            <div id="mensaje"></div>
+        </section>
+
+        <section class="table-section">
+            <h2>Asistencias registradas</h2>
+            <button onclick="cargarAsistencias()">Actualizar listado</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente ID</th>
+                        <th>Fecha ingreso</th>
+                        <th>Método</th>
+                        <th>Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaAsistencias"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="asistencias.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Gym Style Life</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Sistema Gym Style Life</h1>
+        <p>Módulo principal de clientes</p>
+        <a class="btn-volver" href="index.html">Volver al inicio</a>
+    </header>
+
+    <main class="container">
+        <section class="form-section">
+            <h2>Registrar cliente</h2>
+            <form id="clienteForm">
+                <div class="grid">
+                    <input type="text" id="tipo_documento" placeholder="Tipo documento" value="CC" required>
+                    <input type="text" id="documento" placeholder="Cédula" required>
+                    <input type="text" id="nombres" placeholder="Nombres" required>
+                    <input type="text" id="apellidos" placeholder="Apellidos" required>
+                    <input type="date" id="fecha_nacimiento">
+                    <input type="text" id="genero" placeholder="Género">
+                    <input type="text" id="telefono" placeholder="Teléfono">
+                    <input type="text" id="whatsapp" placeholder="WhatsApp">
+                    <input type="email" id="email" placeholder="Correo">
+                    <input type="text" id="direccion" placeholder="Dirección">
+                    <input type="text" id="contacto_emergencia_nombre" placeholder="Contacto emergencia">
+                    <input type="text" id="contacto_emergencia_telefono" placeholder="Teléfono emergencia">
+                    <input type="date" id="fecha_ingreso" required>
+                    <input type="text" id="estado" placeholder="Estado" value="ACTIVO" required>
+                </div>
+
+                <textarea id="observaciones" placeholder="Observaciones"></textarea>
+
+                <button type="submit">Guardar cliente</button>
+            </form>
+
+            <div id="mensaje"></div>
+        </section>
+
+        <section class="table-section">
+            <h2>Clientes registrados</h2>
+
+            <div class="grid">
+                <input type="text" id="busquedaCliente" placeholder="Buscar por cédula, nombre o apellido">
+                <button type="button" onclick="cargarClientes()">Actualizar listado</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Cédula</th>
+                        <th>Nombres</th>
+                        <th>Apellidos / Membresía</th>
+                        <th>Teléfono</th>
+                        <th>WhatsApp</th>
+                        <th>Estado cliente</th>
+                        <th>Acciones rápidas</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaClientes"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <div id="modalMembresia" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Nueva membresía</h3>
+            <p id="modalClienteInfo"></p>
+
+            <div class="modal-group">
+                <label>Plan</label>
+                <div class="planes-grid">
+                    <button type="button" class="btn-plan" data-plan="1">Diario</button>
+                    <button type="button" class="btn-plan" data-plan="2">Semanal</button>
+                    <button type="button" class="btn-plan" data-plan="3">Quincenal</button>
+                    <button type="button" class="btn-plan" data-plan="4">Mensual</button>
+                    <button type="button" class="btn-plan" data-plan="5">Trimestral</button>
+                </div>
+            </div>
+
+            <div class="modal-group">
+                <label for="modalFechaInicio">Fecha inicio</label>
+                <input type="date" id="modalFechaInicio">
+            </div>
+
+            <div class="modal-group">
+                <label>Plan seleccionado</label>
+                <input type="text" id="modalPlanNombre" readonly>
+            </div>
+
+            <div class="modal-group">
+                <label>Fecha fin calculada</label>
+                <input type="text" id="modalFechaFin" readonly>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="btnCancelarModal" class="btn-secundario">Cancelar</button>
+                <button type="button" id="btnCrearMembresiaModal">Crear membresía</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalPago" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>Registrar pago</h3>
+            <p id="modalPagoClienteInfo"></p>
+
+            <div class="modal-group">
+                <label>Membresía activa detectada</label>
+                <input type="text" id="modalPagoMembresiaInfo" readonly>
+            </div>
+
+            <div class="modal-group">
+                <label for="modalPagoValor">Valor pagado</label>
+                <input type="number" id="modalPagoValor" min="0" step="0.01" placeholder="Valor pagado">
+            </div>
+
+            <div class="modal-group">
+                <label for="modalPagoMetodo">Método de pago</label>
+                <input type="text" id="modalPagoMetodo" value="EFECTIVO" placeholder="Método de pago">
+            </div>
+
+            <div class="modal-group">
+                <label for="modalPagoReferencia">Referencia</label>
+                <input type="text" id="modalPagoReferencia" placeholder="Referencia">
+            </div>
+
+            <div class="modal-group">
+                <label for="modalPagoObservaciones">Observaciones</label>
+                <textarea id="modalPagoObservaciones" placeholder="Observaciones del pago"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="btnCancelarModalPago" class="btn-secundario">Cancelar</button>
+                <button type="button" id="btnGuardarPagoModal">Guardar pago</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="clientes.js"></script>
+</body>
+</html>
