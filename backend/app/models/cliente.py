@@ -22,6 +22,8 @@ class Cliente(Base):
     fecha_ingreso = Column(Date, nullable=False)
     estado = Column(String(20), nullable=False, default="ACTIVO")
     observaciones = Column(Text, nullable=True)
+    rfid_uid = Column(String(50), unique=True, nullable=True, index=True)
+    huella_id = Column(Integer, unique=True, nullable=True, index=True)
     creado_en = Column(TIMESTAMP, server_default=func.current_timestamp())
     actualizado_en = Column(
         TIMESTAMP,

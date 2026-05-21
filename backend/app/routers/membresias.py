@@ -1,4 +1,6 @@
+from datetime import date
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,55 @@ def crear_membresia(membresia: MembresiaCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(nueva_membresia)
     return nueva_membresia
+
+
+@router.get("/alertas")
+def alertas_membresias(db: Session = Depends(get_db)):
+    hoy = date.today()
+
+    membresias = db.query(Membresia).order_by(Membresia.fecha_fin.asc()).all()
+
+    vencidas = []
+    vencen_hoy = []
+    por_vencer = []
+
+    for m in membresias:
+        estado = (m.estado or "").upper()
+        if estado == "CANCELADA":
+            continue
+
+        cliente = db.query(Cliente).filter(Cliente.id == m.cliente_id).first()
+        if not cliente or not m.fecha_fin:
+            continue
+
+        dias_restantes = (m.fecha_fin - hoy).days
+
+        item = {
+            "membresia_id": m.id,
+            "cliente_id": m.cliente_id,
+            "plan_id": m.plan_id,
+            "fecha_inicio": m.fecha_inicio.isoformat() if m.fecha_inicio else None,
+            "fecha_fin": m.fecha_fin.isoformat(),
+            "estado": estado,
+            "dias_restantes": dias_restantes,
+            "documento": cliente.documento,
+            "nombre_completo": f"{cliente.nombres} {cliente.apellidos}".strip(),
+            "telefono": cliente.telefono,
+            "whatsapp": cliente.whatsapp,
+        }
+
+        if dias_restantes < 0:
+            vencidas.append(item)
+        elif dias_restantes == 0:
+            vencen_hoy.append(item)
+        elif dias_restantes <= 3:
+            por_vencer.append(item)
+
+    return {
+        "vencidas": vencidas,
+        "vencen_hoy": vencen_hoy,
+        "por_vencer": por_vencer,
+    }
 
 
 @router.get("/", response_model=List[MembresiaResponse])
