@@ -236,6 +236,23 @@ app.post('/send', async (req, res) => {
     }
 });
 
+app.post('/logout', async (req, res) => {
+    if (sock) {
+        try {
+            console.log('Cerrando sesión de WhatsApp por petición de la API...');
+            await sock.logout();
+            connectionStatus = 'INITIALIZING';
+            lastQr = null;
+            res.json({ success: true, message: 'Sesión cerrada exitosamente' });
+        } catch (e) {
+            console.error('Error al hacer logout:', e);
+            res.status(500).json({ error: 'Error al cerrar sesión', details: e.message });
+        }
+    } else {
+        res.status(400).json({ error: 'No hay conexión activa' });
+    }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Microservicio de WhatsApp (Baileys) corriendo en http://localhost:${PORT}`);
 });

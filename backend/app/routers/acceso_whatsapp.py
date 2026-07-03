@@ -138,8 +138,22 @@ def enviar_mensaje_prueba(datos: EnviarPruebaRequest):
             except Exception:
                 pass
             raise HTTPException(status_code=response.status_code, detail=error_detail)
-    except Exception as e:
-        raise HTTPException(
-            status_code=503, 
-            detail=f"No se pudo establecer contacto con el microservicio de WhatsApp: {e}"
-        )
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo contactar al microservicio de WhatsApp: {e}")
+
+@router.post("/logout")
+def desconectar_whatsapp():
+    """Desconecta la sesión de WhatsApp activa en el microservicio."""
+    try:
+        response = requests.post(f"{WHATSAPP_SERVICE_URL}/logout", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            error_detail = "Error desconocido del microservicio de WhatsApp."
+            try:
+                error_detail = response.json().get("error", error_detail)
+            except Exception:
+                pass
+            raise HTTPException(status_code=response.status_code, detail=error_detail)
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo contactar al microservicio de WhatsApp: {e}")

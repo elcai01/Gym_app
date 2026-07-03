@@ -5843,6 +5843,22 @@ class _WhatsAppControlScreenState extends State<WhatsAppControlScreen> {
     );
   }
 
+  Future<void> _desconectar() async {
+    try {
+      final res = await ApiClient.post(
+        Uri.parse('${ApiConfig.baseUrl}/whatsapp/logout'),
+      );
+      if (res.statusCode == 200) {
+        _mostrarSnack('Sesión cerrada con éxito');
+        await _checkStatus();
+      } else {
+        _mostrarSnack('Error al cerrar sesión', esError: true);
+      }
+    } catch (e) {
+      _mostrarSnack('Error de conexión', esError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -5872,6 +5888,18 @@ class _WhatsAppControlScreenState extends State<WhatsAppControlScreen> {
                     ),
                     const SizedBox(height: 12),
                     _buildStatusBadge(),
+                    if (_status == 'CONNECTED') ...[
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade900,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _desconectar,
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Desconectar Sesión'),
+                      ),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
                       Text(
