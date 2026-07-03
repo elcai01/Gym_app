@@ -49,5 +49,5 @@ def obtener_mensajes_programados_hoy(db: Session = Depends(get_db)):
 def forzar_reprocesamiento_cola(db: Session = Depends(get_db)):
     """Ejecuta de inmediato la generación y envío de la cola diaria sin esperar al bucle del scheduler."""
     from app.services.scheduler_service import generate_daily_queue
-    generate_daily_queue(db)
+    generate_daily_queue(db, force=True)
     return {"mensaje": "Generación de la cola diaria gatillada exitosamente."}

@@ -45,13 +45,13 @@ def render_template(content: str, variables: dict) -> str:
         content = content.replace(f"{{{k}}}", str(v) if v is not None else "")
     return content
 
-def generate_daily_queue(db: Session):
+def generate_daily_queue(db: Session, force: bool = False):
     global _last_generation_date
     today = date.today()
-    if _last_generation_date == today:
+    if _last_generation_date == today and not force:
         return
     
-    logger.info(f"Generando cola de mensajes programados para el día: {today}")
+    logger.info(f"Generando cola de mensajes programados para el día: {today} (Forzado: {force})")
     
     # 1. CUMPLEAÑOS
     clientes = db.query(Cliente).all()
