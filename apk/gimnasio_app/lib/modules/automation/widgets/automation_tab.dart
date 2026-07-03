@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/api_client.dart';
 import 'package:gimnasio_app/main.dart';
 
 class AdminAutomationTab extends StatefulWidget {
@@ -51,7 +52,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
     if (!mounted) return;
     setState(() => _cargandoCola = true);
     try {
-      final resp = await http.get(Uri.parse('${widget.baseUrl}/automatizaciones/programados-hoy'));
+      final resp = await ApiClient.get(Uri.parse('${widget.baseUrl}/automatizaciones/programados-hoy'));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (mounted) setState(() => _colaHoy = data);
@@ -67,7 +68,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
     if (!mounted) return;
     setState(() => _cargandoCampanas = true);
     try {
-      final resp = await http.get(Uri.parse('${widget.baseUrl}/campanas/'));
+      final resp = await ApiClient.get(Uri.parse('${widget.baseUrl}/campanas/'));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (mounted) setState(() => _campanas = data);
@@ -83,7 +84,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
     if (!mounted) return;
     setState(() => _cargandoPlantillas = true);
     try {
-      final resp = await http.get(Uri.parse('${widget.baseUrl}/plantillas/'));
+      final resp = await ApiClient.get(Uri.parse('${widget.baseUrl}/plantillas/'));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (mounted) setState(() => _plantillas = data);
@@ -97,7 +98,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
 
   Future<void> _forzarReprocesar() async {
     try {
-      final resp = await http.post(Uri.parse('${widget.baseUrl}/automatizaciones/reprocesar-cola'));
+      final resp = await ApiClient.post(Uri.parse('${widget.baseUrl}/automatizaciones/reprocesar-cola'));
       if (resp.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cola diaria regenerada correctamente.')),
@@ -117,7 +118,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
 
   Future<void> _guardarCampana(Map<String, dynamic> campana) async {
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${widget.baseUrl}/campanas/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(campana),
@@ -138,7 +139,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
 
   Future<void> _eliminarCampana(int id) async {
     try {
-      final resp = await http.delete(Uri.parse('${widget.baseUrl}/campanas/$id'));
+      final resp = await ApiClient.delete(Uri.parse('${widget.baseUrl}/campanas/$id'));
       if (resp.statusCode == 200) {
         _cargarCampanas();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -158,7 +159,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
 
   Future<void> _guardarPlantilla(Map<String, dynamic> plantilla) async {
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${widget.baseUrl}/plantillas/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(plantilla),
@@ -445,7 +446,7 @@ class _AdminAutomationTabState extends State<AdminAutomationTab>
     );
     if (confirmar == true) {
       try {
-        final resp = await http.delete(Uri.parse('${widget.baseUrl}/plantillas/${p['id']}'));
+        final resp = await ApiClient.delete(Uri.parse('${widget.baseUrl}/plantillas/${p['id']}'));
         if (resp.statusCode == 200) {
           _cargarPlantillas();
           ScaffoldMessenger.of(context).showSnackBar(
