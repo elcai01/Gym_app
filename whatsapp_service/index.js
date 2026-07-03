@@ -1,5 +1,7 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, RemoteAuth } = require('whatsapp-web.js');
+const { PostgresStore } = require('wwebjs-postgres');
+const { Pool } = require('pg');
 const qrcode = require('qrcode-terminal');
 const qrImage = require('qr-image');
 const path = require('path');
@@ -14,10 +16,18 @@ let lastQr = null;
 let qrVersion = 0;
 let reconnectTimer = null;
 
-// Inicialización del cliente de WhatsApp con almacenamiento de sesión persistente
+// Configurar conexión a PostgreSQL
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL
+});
+
+const store = new PostgresStore({ pool: pool });
+
+// Inicialización del cliente de WhatsApp con almacenamiento de sesión persistente en BD
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, 'session')
+    authStrategy: new RemoteAuth({
+        store: store,
+        backupSyncIntervalMs: 300000 // Respalda la sesión cada 5 minutos
     }),
     puppeteer: {
         headless: true,
@@ -30,9 +40,15 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu',
+            '--single-process', // Ahorra mucha memoria
+            '--js-flags="--max-old-space-size=256"', // Límite duro de RAM para V8
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         ]
     }
+});
+
+client.on('remote_session_saved', () => {
+    console.log('Sesión de WhatsApp guardada exitosamente en PostgreSQL');
 });
 
 // Eventos de WhatsApp Web
