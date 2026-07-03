@@ -84,7 +84,7 @@ app.include_router(automatizaciones.router)
 app.include_router(promociones.router)
 app.include_router(configuracion.router)
 app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
-app.mount("/panel", StaticFiles(directory=str(PANEL_DIR), html=True), name="panel")
+# app.mount("/panel", StaticFiles(directory=str(PANEL_DIR), html=True), name="panel")
 
 
 # ============================================================================

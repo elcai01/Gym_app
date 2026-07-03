@@ -1,10 +1,15 @@
 FROM python:3.12-slim
 
-# Instalar dependencias del sistema, Node.js y npm
-RUN apt-get update && apt-get install -y curl gnupg && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Instalar dependencias del sistema, Node.js y Chromium para Puppeteer
+RUN apt-get update && apt-get install -y curl gnupg chromium \
+    libnss3 libatk-bridge2.0-0 libx11-xcb1 libxcb-dri3-0 libxcomposite1 \
+    libxdamage1 libxfixes3 libcups2 libdrm2 libxrandr2 libgbm1 libasound2 \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
