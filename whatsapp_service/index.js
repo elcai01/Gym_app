@@ -1,147 +1,169 @@
 const express = require('express');
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-const { PostgresStore } = require('wwebjs-postgres');
+const { default: makeWASocket, initAuthCreds, BufferJSON, DisconnectReason, proto } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const { Pool } = require('pg');
 const qrcode = require('qrcode-terminal');
 const qrImage = require('qr-image');
-const path = require('path');
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.WHATSAPP_PORT || 3001;
-
-let connectionStatus = 'INITIALIZING';
-let lastQr = null;
-let qrVersion = 0;
-let reconnectTimer = null;
-
-// Configurar conexión a PostgreSQL
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL
 });
 
-const store = new PostgresStore({ pool: pool });
+let connectionStatus = 'INITIALIZING';
+let lastQr = null;
+let qrVersion = 0;
+let sock = null;
 
-// Inicialización del cliente de WhatsApp con almacenamiento de sesión persistente en BD
-const client = new Client({
-    authStrategy: new RemoteAuth({
-        store: store,
-        backupSyncIntervalMs: 300000 // Respalda la sesión cada 5 minutos
-    }),
-    puppeteer: {
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--single-process', // Ahorra mucha memoria
-            '--js-flags="--max-old-space-size=256"', // Límite duro de RAM para V8
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-        ]
-    }
-});
+// ==========================================
+// Postgres Auth State Adapter for Baileys
+// ==========================================
+async function usePostgresAuthState(pool, sessionName = 'baileys_auth') {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS auth_state (
+            session_name TEXT,
+            key TEXT,
+            value TEXT,
+            PRIMARY KEY (session_name, key)
+        )
+    `);
 
-client.on('remote_session_saved', () => {
-    console.log('Sesión de WhatsApp guardada exitosamente en PostgreSQL');
-});
-
-// Eventos de WhatsApp Web
-client.on('qr', (qr) => {
-    lastQr = qr;
-    qrVersion += 1;
-    connectionStatus = 'QR_READY';
-    console.log('\n======================================================');
-    console.log('CÓDIGO QR GENERADO. Escanéalo con WhatsApp en tu celular:');
-    qrcode.generate(qr, { small: true });
-    console.log('======================================================\n');
-});
-
-client.on('ready', () => {
-    connectionStatus = 'CONNECTED';
-    lastQr = null;
-    console.log('¡WhatsApp Web conectado exitosamente y listo para enviar mensajes!');
-});
-
-client.on('authenticated', () => {
-    connectionStatus = 'AUTHENTICATING';
-    lastQr = null;
-    console.log('Autenticación con WhatsApp Web exitosa.');
-});
-
-client.on('change_state', (state) => {
-    console.log('Estado interno de WhatsApp Web:', state);
-    if (state === 'CONNECTED') {
-        connectionStatus = 'CONNECTED';
-        lastQr = null;
-    } else if (!lastQr && connectionStatus !== 'AUTHENTICATING') {
-        connectionStatus = 'INITIALIZING';
-    }
-});
-
-client.on('auth_failure', (msg) => {
-    connectionStatus = 'DISCONNECTED';
-    lastQr = null;
-    console.error('Fallo en la autenticación de sesión:', msg);
-});
-
-client.on('disconnected', (reason) => {
-    connectionStatus = 'DISCONNECTED';
-    lastQr = null;
-    console.log('Sesión desconectada. Razón:', reason);
-    scheduleReconnect();
-});
-
-function scheduleReconnect() {
-    if (reconnectTimer) return;
-
-    reconnectTimer = setTimeout(async () => {
-        reconnectTimer = null;
-        connectionStatus = 'INITIALIZING';
+    const writeData = async (data, key) => {
         try {
-            await client.destroy();
-        } catch (_) {
-            // El navegador puede estar cerrado ya; LocalAuth permanece guardado.
-        }
+            await pool.query(
+                `INSERT INTO auth_state (session_name, key, value) VALUES ($1, $2, $3)
+                 ON CONFLICT (session_name, key) DO UPDATE SET value = $3`,
+                [sessionName, key, JSON.stringify(data, BufferJSON.replacer)]
+            );
+        } catch (e) { console.error('Error writing auth data', e); }
+    };
 
+    const readData = async (key) => {
         try {
-            await client.initialize();
-        } catch (err) {
-            connectionStatus = 'DISCONNECTED';
-            console.error('Error al re-inicializar cliente:', err);
-            scheduleReconnect();
+            const res = await pool.query(
+                `SELECT value FROM auth_state WHERE session_name = $1 AND key = $2`,
+                [sessionName, key]
+            );
+            if (res.rows.length > 0) {
+                return JSON.parse(res.rows[0].value, BufferJSON.reviver);
+            }
+        } catch (e) { console.error('Error reading auth data', e); }
+        return null;
+    };
+
+    const removeData = async (key) => {
+        try {
+            await pool.query(
+                `DELETE FROM auth_state WHERE session_name = $1 AND key = $2`,
+                [sessionName, key]
+            );
+        } catch (e) { console.error('Error removing auth data', e); }
+    };
+
+    let creds = await readData('creds');
+    if (!creds) {
+        creds = initAuthCreds();
+        await writeData(creds, 'creds');
+    }
+
+    return {
+        state: {
+            creds,
+            keys: {
+                get: async (type, ids) => {
+                    const data = {};
+                    await Promise.all(
+                        ids.map(async id => {
+                            let value = await readData(`${type}-${id}`);
+                            if (type === 'app-state-sync-key' && value) {
+                                value = proto.Message.AppStateSyncKeyData.fromObject(value);
+                            }
+                            data[id] = value;
+                        })
+                    );
+                    return data;
+                },
+                set: async (data) => {
+                    const tasks = [];
+                    for (const category in data) {
+                        for (const id in data[category]) {
+                            const value = data[category][id];
+                            const key = `${category}-${id}`;
+                            tasks.push(value ? writeData(value, key) : removeData(key));
+                        }
+                    }
+                    await Promise.all(tasks);
+                }
+            }
+        },
+        saveCreds: () => {
+            return writeData(creds, 'creds');
         }
-    }, 5000);
+    };
 }
 
-// Inicializar el cliente al arrancar el servidor
-client.initialize().catch(err => {
-    console.error('Error crítico al inicializar cliente de WhatsApp:', err);
-});
+// ==========================================
+// Baileys Connection Setup
+// ==========================================
+async function connectToWhatsApp() {
+    connectionStatus = 'INITIALIZING';
+    const { state, saveCreds } = await usePostgresAuthState(pool, 'gym_whatsapp');
+
+    sock = makeWASocket({
+        auth: state,
+        logger: pino({ level: 'silent' }), // Reduce logs to save memory/disk
+        printQRInTerminal: false,
+        browser: ['Gym Style Life', 'Chrome', '1.0.0'],
+        syncFullHistory: false, // Don't download entire history
+        generateHighQualityLinkPreview: false
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            lastQr = qr;
+            qrVersion += 1;
+            connectionStatus = 'QR_READY';
+            console.log('\n======================================================');
+            console.log('CÓDIGO QR GENERADO. Escanéalo con WhatsApp en tu celular:');
+            qrcode.generate(qr, { small: true });
+            console.log('======================================================\n');
+        }
+
+        if (connection === 'close') {
+            connectionStatus = 'DISCONNECTED';
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log('Conexión cerrada. Status:', statusCode, 'Reconectar:', shouldReconnect);
+            
+            if (shouldReconnect) {
+                setTimeout(connectToWhatsApp, 5000);
+            } else {
+                console.log('Sesión cerrada manualmente. Esperando nuevo QR...');
+                pool.query(`DELETE FROM auth_state WHERE session_name = 'gym_whatsapp'`).then(() => {
+                    setTimeout(connectToWhatsApp, 2000);
+                });
+            }
+        } else if (connection === 'open') {
+            connectionStatus = 'CONNECTED';
+            lastQr = null;
+            console.log('¡WhatsApp conectado exitosamente y listo para enviar mensajes!');
+        }
+    });
+}
+
+connectToWhatsApp().catch(err => console.error('Error inicializando WhatsApp:', err));
 
 // ============================================================================
 // Endpoints API
 // ============================================================================
-
-// Obtener estado actual de conexión
-app.get('/status', async (req, res) => {
-    // Verifica la sesion real al regresar a la pantalla. Durante el arranque,
-    // conserva el ultimo evento conocido para no mostrar falsos desconectados.
-    try {
-        const realState = await client.getState();
-        if (realState === 'CONNECTED') {
-            connectionStatus = 'CONNECTED';
-            lastQr = null;
-        }
-    } catch (_) {
-        // getState puede fallar brevemente mientras Puppeteer inicia.
-    }
-
+app.get('/status', (req, res) => {
     let qrBase64 = null;
     if (lastQr) {
         try {
@@ -161,10 +183,9 @@ app.get('/status', async (req, res) => {
     });
 });
 
-// Obtener la imagen PNG del código QR
 app.get('/qr', (req, res) => {
     if (!lastQr) {
-        return res.status(404).send('Código QR no disponible. WhatsApp ya está conectado o iniciándose.');
+        return res.status(404).send('Código QR no disponible.');
     }
     try {
         const qrPng = qrImage.image(lastQr, { type: 'png', size: 6 });
@@ -175,7 +196,6 @@ app.get('/qr', (req, res) => {
     }
 });
 
-// Enviar un mensaje
 app.post('/send', async (req, res) => {
     const { phone, message } = req.body;
     
@@ -183,7 +203,7 @@ app.post('/send', async (req, res) => {
         return res.status(400).json({ error: 'Faltan parámetros: "phone" o "message"' });
     }
     
-    if (connectionStatus !== 'CONNECTED') {
+    if (connectionStatus !== 'CONNECTED' || !sock) {
         return res.status(503).json({ 
             error: 'WhatsApp no está conectado en el servidor',
             status: connectionStatus 
@@ -191,29 +211,24 @@ app.post('/send', async (req, res) => {
     }
 
     try {
-        // Limpiamos el número de cualquier caracter no numérico
         let cleanPhone = phone.replace(/\D/g, '');
-        
-        // Formato para Colombia: si tiene 10 dígitos (ej: 3123456789), le agregamos el indicativo de país (57)
         if (cleanPhone.length === 10 && cleanPhone.startsWith('3')) {
             cleanPhone = '57' + cleanPhone;
         }
+        
+        // Baileys requiere jid en formato número@s.whatsapp.net
+        const jid = `${cleanPhone}@s.whatsapp.net`;
 
-        // WhatsApp requiere que el identificador termine con @c.us para contactos individuales
-        if (!cleanPhone.endsWith('@c.us')) {
-            cleanPhone = `${cleanPhone}@c.us`;
-        }
-
-        console.log(`[API] Enviando mensaje a: ${cleanPhone}`);
-        const result = await client.sendMessage(cleanPhone, message);
+        console.log(`[API] Enviando mensaje a: ${jid}`);
+        const result = await sock.sendMessage(jid, { text: message });
         
         res.json({
             success: true,
-            messageId: result.id.id,
-            timestamp: result.timestamp
+            messageId: result?.key?.id,
+            timestamp: Date.now()
         });
     } catch (err) {
-        console.error('Error al enviar mensaje por WhatsApp Web:', err);
+        console.error('Error al enviar mensaje:', err);
         res.status(500).json({ 
             error: 'No se pudo enviar el mensaje', 
             details: err.message 
@@ -222,5 +237,5 @@ app.post('/send', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Microservicio de WhatsApp corriendo en http://localhost:${PORT}`);
+    console.log(`Microservicio de WhatsApp (Baileys) corriendo en http://localhost:${PORT}`);
 });
