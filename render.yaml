@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: gym-style-life-backend
+    env: docker
+    region: ohio
+    plan: free
+    dockerCommand: /app/start_services.sh
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: WHATSAPP_SERVICE_URL
+        value: "http://localhost:3001"

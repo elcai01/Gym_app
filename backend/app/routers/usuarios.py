@@ -11,11 +11,14 @@ from app.schemas.usuario import (
     LoginRequest,
     LoginResponse,
     UsuarioClienteCreate,
+    UsuarioStaffCreate,
     UsuarioOut,
 )
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
+
+from app.core.security import verify_password, get_password_hash, create_access_token
 
 @router.post("/login", response_model=LoginResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
@@ -29,7 +32,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado o inactivo.")
 
-    if usuario.password_hash != data.password:
+    if not verify_password(data.password, usuario.password_hash):
         raise HTTPException(status_code=401, detail="Contraseña incorrecta.")
 
     rol = db.query(Rol).filter(Rol.id == usuario.rol_id).first()
@@ -38,6 +41,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     usuario.ultimo_acceso = datetime.now()
     db.commit()
     db.refresh(usuario)
+    
+    token = create_access_token({"sub": usuario.username, "rol": nombre_rol})
 
     return LoginResponse(
         id=usuario.id,
@@ -46,6 +51,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         rol=nombre_rol,
         cliente_id=usuario.cliente_id,
         activo=usuario.activo,
+        token=token
     )
 
 
@@ -74,7 +80,7 @@ def crear_usuario_cliente(data: UsuarioClienteCreate, db: Session = Depends(get_
     nuevo_usuario = Usuario(
         nombre=f"{cliente.nombres} {cliente.apellidos}".strip(),
         username=username,
-        password_hash=data.password,
+        password_hash=get_password_hash(data.password),
         rol_id=rol_cliente.id,
         cliente_id=cliente.id,
         activo=True,
@@ -89,6 +95,39 @@ def crear_usuario_cliente(data: UsuarioClienteCreate, db: Session = Depends(get_
         nombre=nuevo_usuario.nombre,
         username=nuevo_usuario.username,
         rol=rol_cliente.nombre.upper(),
+        cliente_id=nuevo_usuario.cliente_id,
+        activo=nuevo_usuario.activo,
+    )
+
+
+@router.post("/staff", response_model=UsuarioOut)
+def crear_usuario_staff(data: UsuarioStaffCreate, db: Session = Depends(get_db)):
+    existente_username = db.query(Usuario).filter(Usuario.username == data.username).first()
+    if existente_username:
+        raise HTTPException(status_code=400, detail="Ese username ya existe.")
+
+    rol = db.query(Rol).filter(Rol.id == data.rol_id).first()
+    if not rol:
+        raise HTTPException(status_code=400, detail="El rol especificado no existe.")
+
+    nuevo_usuario = Usuario(
+        nombre=data.nombre.strip(),
+        username=data.username.strip(),
+        password_hash=get_password_hash(data.password),
+        rol_id=rol.id,
+        cliente_id=None,
+        activo=True,
+    )
+
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    return UsuarioOut(
+        id=nuevo_usuario.id,
+        nombre=nuevo_usuario.nombre,
+        username=nuevo_usuario.username,
+        rol=rol.nombre.upper(),
         cliente_id=nuevo_usuario.cliente_id,
         activo=nuevo_usuario.activo,
     )

@@ -7,14 +7,13 @@ from app.models.cliente import Cliente
 from app.models.membresia import Membresia
 from app.models.asistencia import Asistencia
 from app.schemas.acceso import (
-    RegistrarTarjetaRequest,
     RegistrarHuellaRequest,
     ValidarAccesoResponse,
     ClienteAccesoInfo,
 )
 from app.schemas.cliente import ClienteResponse
 
-router = APIRouter(prefix="/acceso", tags=["Acceso (RFID y Huella)"])
+router = APIRouter(prefix="/acceso", tags=["Acceso (Huella)"])
 
 # ============================================================
 # Audios disponibles en la microSD del DFPlayer (recepción)
@@ -27,8 +26,6 @@ AUDIO_NO_RECONOCIDO = "005_no_reconocido.mp3"
 AUDIO_INACTIVO = "006_inactivo.mp3"
 AUDIO_YA_INGRESO = "007_ya_ingreso.mp3"
 
-def _normalizar_uid(uid: str) -> str:
-    return uid.strip().upper()
 
 def _cliente_a_info(cliente: Cliente) -> ClienteAccesoInfo:
     return ClienteAccesoInfo(
@@ -126,75 +123,6 @@ def _evaluar_acceso(cliente: Cliente, db: Session) -> ValidarAccesoResponse:
         dias_restantes=dias_restantes,
         fecha_fin=membresia.fecha_fin.isoformat(),
     )
-
-
-# ============================================================
-# ENDPOINTS RFID
-# ============================================================
-
-@router.get("/validar", response_model=ValidarAccesoResponse)
-def validar_acceso_rfid(
-    rfid: str = Query(..., description="UID de la tarjeta RFID"),
-    db: Session = Depends(get_db),
-):
-    uid = _normalizar_uid(rfid)
-    cliente = db.query(Cliente).filter(Cliente.rfid_uid == uid).first()
-    if not cliente:
-        return ValidarAccesoResponse(
-            permitido=False,
-            razon="tarjeta_no_registrada",
-            mensaje="Tarjeta no asignada a ningún cliente",
-            audio=AUDIO_NO_RECONOCIDO,
-        )
-
-    resultado = _evaluar_acceso(cliente, db)
-
-    if resultado.asistencia_id and resultado.razon in ("ok", "por_vencer"):
-        asistencia = db.query(Asistencia).filter(Asistencia.id == resultado.asistencia_id).first()
-        if asistencia:
-            asistencia.metodo_ingreso = "RFID"
-            db.commit()
-
-    return resultado
-
-
-@router.post("/registrar-tarjeta", response_model=ClienteResponse)
-def registrar_tarjeta(datos: RegistrarTarjetaRequest, db: Session = Depends(get_db)):
-    uid = _normalizar_uid(datos.rfid_uid)
-    cliente = db.query(Cliente).filter(Cliente.id == datos.cliente_id).first()
-    if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-
-    en_uso = db.query(Cliente).filter(Cliente.rfid_uid == uid, Cliente.id != cliente.id).first()
-    if en_uso:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tarjeta ya asignada a {en_uso.nombres} {en_uso.apellidos} (ID {en_uso.id})",
-        )
-
-    cliente.rfid_uid = uid
-    db.commit()
-    db.refresh(cliente)
-    return cliente
-
-
-@router.delete("/quitar-tarjeta/{cliente_id}")
-def quitar_tarjeta(cliente_id: int, db: Session = Depends(get_db)):
-    cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
-    if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    cliente.rfid_uid = None
-    db.commit()
-    return {"ok": True, "mensaje": "Tarjeta desasignada"}
-
-
-@router.get("/por-rfid/{uid}", response_model=ClienteResponse)
-def obtener_cliente_por_rfid(uid: str, db: Session = Depends(get_db)):
-    uid_n = _normalizar_uid(uid)
-    cliente = db.query(Cliente).filter(Cliente.rfid_uid == uid_n).first()
-    if not cliente:
-        raise HTTPException(status_code=404, detail="Tarjeta no registrada")
-    return cliente
 
 
 # ============================================================

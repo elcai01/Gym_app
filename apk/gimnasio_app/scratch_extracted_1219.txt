@@ -1,0 +1,10 @@
+class _WhatsAppControlScreenState extends State<WhatsAppControlScreen> {
+  String _status = 'DISCONNECTED';
+  bool _hasQr = false;
+  String? _qrBase64;
+  String? _error;
+  bool _checking = false;
+  Timer? _timer;
+  int _timestamp = DateTime.now().millisecondsSinceEpoch;
+
+  final _phoneCtrl = TextEditingController();

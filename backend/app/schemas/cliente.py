@@ -20,7 +20,6 @@ class ClienteBase(BaseModel):
     fecha_ingreso: date
     estado: str = "ACTIVO"
     observaciones: Optional[str] = None
-    rfid_uid: Optional[str] = None
     huella_id: Optional[int] = None
 
 
@@ -45,7 +44,6 @@ class ClienteUpdate(BaseModel):
     fecha_ingreso: Optional[date] = None
     estado: Optional[str] = None
     observaciones: Optional[str] = None
-    rfid_uid: Optional[str] = None
     huella_id: Optional[int] = None
 
 

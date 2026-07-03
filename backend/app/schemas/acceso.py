@@ -2,11 +2,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class RegistrarTarjetaRequest(BaseModel):
-    cliente_id: int
-    rfid_uid: str
-
-
 class RegistrarHuellaRequest(BaseModel):
     cliente_id: int
     huella_id: int

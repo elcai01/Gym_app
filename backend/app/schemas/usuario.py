@@ -14,12 +14,20 @@ class LoginResponse(BaseModel):
     rol: str
     cliente_id: Optional[int] = None
     activo: bool
+    token: str
 
 
 class UsuarioClienteCreate(BaseModel):
     cliente_id: int
     password: str
     username: Optional[str] = None
+
+
+class UsuarioStaffCreate(BaseModel):
+    nombre: str
+    username: str
+    password: str
+    rol_id: int
 
 
 class UsuarioOut(BaseModel):

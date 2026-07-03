@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.rutina import Rutina, RutinaEjercicio, ClienteRutina
+from app.models.rutina import Rutina, RutinaEjercicio, ClienteRutina, ClienteRutinaProgreso
 from app.models.ejercicio import Ejercicio
 from app.models.cliente import Cliente
 from app.schemas.rutina import (
@@ -275,7 +275,7 @@ class AsignacionAutomaticaRequest(BaseModel):
     tipo: str = "mixta"
 
 
-def construir_detalle_rutina(db: Session, rutina: Rutina) -> RutinaDetalleResponse:
+def construir_detalle_rutina(db: Session, rutina: Rutina, cliente_rutina_id: int = None) -> RutinaDetalleResponse:
     items = (
         db.query(RutinaEjercicio, Ejercicio)
         .join(Ejercicio, Ejercicio.id == RutinaEjercicio.ejercicio_id)
@@ -284,11 +284,18 @@ def construir_detalle_rutina(db: Session, rutina: Rutina) -> RutinaDetalleRespon
         .all()
     )
 
+    progreso_dict = {}
+    if cliente_rutina_id:
+        progresos = db.query(ClienteRutinaProgreso).filter(ClienteRutinaProgreso.cliente_rutina_id == cliente_rutina_id).all()
+        for p in progresos:
+            progreso_dict[p.rutina_ejercicio_id] = p.cumplido
+
     ejercicios = []
-    for re, ejr in items:
+    for re_obj, ejr in items:
+        cumplido = progreso_dict.get(re_obj.id, False)
         ejercicios.append(
             RutinaEjercicioResponse(
-                id=re.id,
+                id=re_obj.id,
                 ejercicio_id=ejr.id,
                 nombre=ejr.nombre,
                 grupo_muscular=ejr.grupo_muscular,
@@ -297,12 +304,13 @@ def construir_detalle_rutina(db: Session, rutina: Rutina) -> RutinaDetalleRespon
                 imagen_url=ejr.imagen_url,
                 gif_url=ejr.gif_url,
                 video_url=ejr.video_url,
-                dia=re.dia,
-                orden=re.orden,
-                series=re.series,
-                repeticiones=re.repeticiones,
-                descanso=re.descanso,
-                observaciones=re.observaciones,
+                dia=re_obj.dia,
+                orden=re_obj.orden,
+                series=re_obj.series,
+                repeticiones=re_obj.repeticiones,
+                descanso=re_obj.descanso,
+                observaciones=re_obj.observaciones,
+                cumplido=cumplido,
             )
         )
 
@@ -375,15 +383,6 @@ def crear_rutina_desde_catalogo(db: Session, plantilla: dict) -> Rutina:
 
     db.commit()
     return rutina
-
-
-@router.post("/", response_model=RutinaResponse)
-def crear_rutina(datos: RutinaCreate, db: Session = Depends(get_db)):
-    nueva = Rutina(**datos.model_dump())
-    db.add(nueva)
-    db.commit()
-    db.refresh(nueva)
-    return nueva
 
 
 @router.get("/", response_model=List[RutinaResponse])
@@ -485,7 +484,7 @@ def asignar_rutina(data: ClienteRutinaAssign, db: Session = Depends(get_db)):
         fecha_fin=nueva.fecha_fin,
         activa=nueva.activa,
         observaciones=nueva.observaciones,
-        rutina=construir_detalle_rutina(db, rutina),
+        rutina=construir_detalle_rutina(db, rutina, nueva.id),
     )
 
 
@@ -541,7 +540,7 @@ def asignar_rutina_automatica(data: AsignacionAutomaticaRequest, db: Session = D
         fecha_fin=asignacion.fecha_fin,
         activa=asignacion.activa,
         observaciones=asignacion.observaciones,
-        rutina=construir_detalle_rutina(db, rutina),
+        rutina=construir_detalle_rutina(db, rutina, asignacion.id),
     )
 
 
@@ -568,7 +567,7 @@ def rutina_actual_cliente(cliente_id: int, db: Session = Depends(get_db)):
         fecha_fin=cliente_rutina.fecha_fin,
         activa=cliente_rutina.activa,
         observaciones=cliente_rutina.observaciones,
-        rutina=construir_detalle_rutina(db, rutina),
+        rutina=construir_detalle_rutina(db, rutina, cliente_rutina.id),
     )
 @router.put("/completar/{cliente_rutina_id}")
 def completar_rutina(cliente_rutina_id: int, db: Session = Depends(get_db)):
@@ -613,29 +612,36 @@ def cumplir_ejercicio_cliente(
     if not rutina_ejercicio:
         raise HTTPException(status_code=404, detail="Ejercicio no encontrado en la rutina")
 
-    # marcar el ejercicio como cumplido
-    if hasattr(rutina_ejercicio, "completada"):
-        rutina_ejercicio.completada = True
+    # Guardar en ClienteRutinaProgreso
+    from sqlalchemy.sql import func
+    progreso = db.query(ClienteRutinaProgreso).filter(
+        ClienteRutinaProgreso.cliente_rutina_id == cliente_rutina_id,
+        ClienteRutinaProgreso.rutina_ejercicio_id == rutina_ejercicio_id
+    ).first()
 
-    # si todos los ejercicios quedaron cumplidos, cerrar la rutina activa
-    ejercicios = (
-        db.query(RutinaEjercicio)
-        .filter(RutinaEjercicio.rutina_id == cliente_rutina.rutina_id)
-        .all()
-    )
-
-    total = len(ejercicios)
-    cumplidos = len([e for e in ejercicios if getattr(e, "completada", False)])
-
-    if total > 0 and cumplidos >= total:
-        cliente_rutina.completada = True
-        cliente_rutina.activa = False
+    if progreso:
+        progreso.cumplido = True
+        progreso.fecha_cumplido = func.now()
+    else:
+        nuevo_progreso = ClienteRutinaProgreso(
+            cliente_rutina_id=cliente_rutina_id,
+            rutina_ejercicio_id=rutina_ejercicio_id,
+            cumplido=True,
+            fecha_cumplido=func.now()
+        )
+        db.add(nuevo_progreso)
 
     db.commit()
 
-    return {
-        "ok": True,
-        "mensaje": "Ejercicio marcado como cumplido",
-        "cliente_rutina_id": cliente_rutina_id,
-        "rutina_ejercicio_id": rutina_ejercicio_id,
-    }
+    # Verificar si todos están cumplidos
+    total_ejercicios = db.query(RutinaEjercicio).filter(RutinaEjercicio.rutina_id == cliente_rutina.rutina_id).count()
+    cumplidos = db.query(ClienteRutinaProgreso).filter(
+        ClienteRutinaProgreso.cliente_rutina_id == cliente_rutina_id,
+        ClienteRutinaProgreso.cumplido == True
+    ).count()
+
+    if cumplidos >= total_ejercicios and total_ejercicios > 0:
+        cliente_rutina.completada = True
+        db.commit()
+
+    return {"ok": True, "mensaje": "Ejercicio marcado como cumplido"}

@@ -1,0 +1,311 @@
+  }
+}
+
+class WhatsAppControlScreen extends StatefulWidget {
+  const WhatsAppControlScreen({super.key});
+
+  @override
+  State<WhatsAppControlScreen> createState() => _WhatsAppControlScreenState();
+}
+
+class _WhatsAppControlScreenState extends State<WhatsAppControlScreen> {
+  String _status = 'DISCONNECTED';
+  bool _hasQr = false;
+  String? _error;
+  bool _checking = false;
+  Timer? _timer;
+  int _timestamp = DateTime.now().millisecondsSinceEpoch;
+
+  final _phoneCtrl = TextEditingController();
+  final _msgCtrl = TextEditingController();
+  bool _sendingTest = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _checkStatus());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _phoneCtrl.dispose();
+    _msgCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkStatus() async {
+    if (_checking) return;
+    if (mounted) setState(() => _checking = true);
+    try {
+      final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/whatsapp/status'));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (mounted) {
+          setState(() {
+            _status = data['status'] ?? 'DISCONNECTED';
+            _hasQr = data['hasQr'] ?? false;
+            _error = null;
+            if (_hasQr) {
+              _timestamp = DateTime.now().millisecondsSinceEpoch;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _status = 'DISCONNECTED';
+          _hasQr = false;
+          _error = 'No se pudo conectar con el backend: $e';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _enviarPrueba() async {
+    final phone = _phoneCtrl.text.trim();
+    final message = _msgCtrl.text.trim();
+    if (phone.isEmpty || message.isEmpty) {
+      _mostrarSnack('Completa los campos de prueba', esError: true);
+      return;
+    }
+    setState(() => _sendingTest = true);
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/whatsapp/enviar-prueba'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'message': message,
+        }),
+      );
+      if (res.statusCode == 200) {
+        _phoneCtrl.clear();
+        _msgCtrl.clear();
+        _mostrarSnack('¡Mensaje de prueba enviado con éxito!');
+      } else {
+        String detail = res.body;
+        try {
+          final data = jsonDecode(res.body);
+          detail = data['detail'] ?? res.body;
+        } catch (_) {}
+        _mostrarSnack('Error: $detail', esError: true);
+      }
+    } catch (e) {
+      _mostrarSnack('Error al enviar: $e', esError: true);
+    } finally {
+      if (mounted) setState(() => _sendingTest = false);
+    }
+  }
+
+  void _mostrarSnack(String msg, {bool esError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: esError ? Colors.red.shade900 : Colors.green.shade900,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1117),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF161B22),
+        title: const Text('Configuración de WhatsApp'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Card(
+              color: const Color(0xFF161B22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Estado de la Conexión',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatusBadge(),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_status == 'QR_READY' || _hasQr) _buildQrSection(),
+            if (_status == 'CONNECTED') _buildTestSection(),
+            if (_status == 'DISCONNECTED' && !_hasQr)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Text(
+                    'Esperando código QR o inicialización del servicio...',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge() {
+    Color color;
+    String label;
+    switch (_status) {
+      case 'CONNECTED':
+        color = Colors.green;
+        label = 'CONECTADO';
+        break;
+      case 'QR_READY':
+        color = Colors.orange;
+        label = 'ESPERANDO ESCANEO';
+        break;
+      case 'AUTHENTICATING':
+        color = Colors.blue;
+        label = 'AUTENTICANDO...';
+        break;
+      default:
+        color = Colors.red;
+        label = 'DESCONECTADO';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+    );
+  }
+
+  Widget _buildQrSection() {
+    return Column(
+      children: [
+        const Text(
+          'Escanea este código QR con WhatsApp:',
+          style: TextStyle(fontSize: 16, color: Colors.white70),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Image.network(
+            '${ApiConfig.baseUrl}/whatsapp/qr?t=$_timestamp',
+            width: 250,
+            height: 250,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const SizedBox(
+                width: 250,
+                height: 250,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return const SizedBox(
+                width: 250,
+                height: 250,
+                child: Center(
+                  child: Text(
+                    'Generando código QR...',
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _timestamp = DateTime.now().millisecondsSinceEpoch;
+            });
+            _checkStatus();
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Actualizar QR'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTestSection() {
+    return Card(
+      color: const Color(0xFF161B22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Colors.white12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enviar Mensaje de Prueba',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _phoneCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Número de Teléfono (con indicativo, ej: 57312...)',
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _msgCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Mensaje de texto',
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _sendingTest ? null : _enviarPrueba,
+              child: _sendingTest
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Enviar Mensaje'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

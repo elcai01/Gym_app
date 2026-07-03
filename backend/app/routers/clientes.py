@@ -1,5 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+import os
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -207,3 +209,30 @@ def eliminar_cliente_completo_por_cedula(cedula: str, db: Session = Depends(get_
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error eliminando cliente: {e}")
+
+@router.post("/{cliente_id}/foto")
+def subir_foto_cliente(cliente_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    # Crear carpeta media/clientes si no existe
+    media_dir = "media/clientes"
+    os.makedirs(media_dir, exist_ok=True)
+
+    # Nombre seguro
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    file_name = f"cliente_{cliente_id}.{file_ext}"
+    file_path = os.path.join(media_dir, file_name)
+
+    # Guardar archivo
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Actualizar BD
+    foto_url = f"/media/clientes/{file_name}"
+    cliente.foto_url = foto_url
+    db.commit()
+    db.refresh(cliente)
+
+    return {"mensaje": "Foto actualizada correctamente", "foto_url": foto_url}

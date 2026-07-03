@@ -1,0 +1,19 @@
+              );
+            },
+            icon: const Icon(Icons.bluetooth_searching, color: AppColors.gold),
+            tooltip: 'Báscula BLE',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WhatsAppControlScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.gold),
+            tooltip: 'WhatsApp',
+          ),
+          IconButton(
+            onPressed: cerrarSesion,

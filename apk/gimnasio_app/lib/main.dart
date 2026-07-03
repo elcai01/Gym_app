@@ -1,12 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:gimnasio_app/utils/api_client.dart';
+import 'modules/scale/widgets/scale_debug_screen.dart' as scale_module;
+import 'modules/automation/widgets/automation_tab.dart';
+import 'modules/promotions/widgets/promotions_tab.dart';
+import 'modules/settings/admin_settings_tab.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await UserSession.loadSession();
   runApp(const GymStyleLifeApp());
 }
 
@@ -15,7 +25,9 @@ class GymStyleLifeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return Listener(
+      onPointerDown: (_) => UserSession.updateActivity(),
+      child: MaterialApp(
       title: 'Gym Style Life',
       debugShowCheckedModeBanner: false,
       scrollBehavior: const AppScrollBehavior(),
@@ -27,55 +39,35 @@ class GymStyleLifeApp extends StatelessWidget {
           secondary: AppColors.goldSoft,
           surface: AppColors.card,
         ),
-        textTheme: const TextTheme(
-          titleLarge: TextStyle(
-            color: AppColors.text,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.2,
-          ),
-          titleMedium: TextStyle(
-            color: AppColors.text,
-            fontWeight: FontWeight.w600,
-          ),
+        textTheme: GoogleFonts.outfitTextTheme(const TextTheme(
+          titleLarge: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          titleMedium: TextStyle(color: AppColors.text, fontWeight: FontWeight.w600),
           bodyLarge: TextStyle(color: AppColors.text),
           bodyMedium: TextStyle(color: AppColors.text),
-        ),
-        appBarTheme: const AppBarTheme(
+        )),
+        appBarTheme: AppBarTheme(
           backgroundColor: AppColors.background,
           foregroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: AppColors.text,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+          titleTextStyle: GoogleFonts.outfit(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
         ),
         cardTheme: CardThemeData(
           color: AppColors.card,
-          elevation: 10,
-          shadowColor: Colors.black.withOpacity(0.22),
+          elevation: 16,
+          shadowColor: AppColors.gold.withValues(alpha: 0.1),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: AppColors.border, width: 1),
+            borderRadius: BorderRadius.circular(28),
+            side: const BorderSide(color: AppColors.border, width: 1.2),
           ),
           margin: EdgeInsets.zero,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: AppColors.input,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 18,
-          ),
-          labelStyle: const TextStyle(
-            color: AppColors.textSoft,
-            fontWeight: FontWeight.w500,
-          ),
-          floatingLabelStyle: const TextStyle(
-            color: AppColors.goldSoft,
-            fontWeight: FontWeight.w700,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          labelStyle: const TextStyle(color: AppColors.textSoft, fontWeight: FontWeight.w500),
+          floatingLabelStyle: const TextStyle(color: AppColors.goldSoft, fontWeight: FontWeight.w700),
           hintStyle: const TextStyle(color: AppColors.textSoft),
           prefixIconColor: AppColors.gold,
           suffixIconColor: AppColors.textSoft,
@@ -100,14 +92,15 @@ class GymStyleLifeApp extends StatelessWidget {
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.gold,
             foregroundColor: Colors.black,
-            elevation: 2,
-            shadowColor: Colors.black.withOpacity(0.25),
-            textStyle: const TextStyle(
+            elevation: 8,
+            shadowColor: AppColors.gold.withValues(alpha: 0.4),
+            textStyle: GoogleFonts.outfit(
               fontWeight: FontWeight.w800,
-              fontSize: 15,
+              fontSize: 16,
+              letterSpacing: 0.3,
             ),
-            minimumSize: const Size.fromHeight(54),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            minimumSize: const Size.fromHeight(56),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
@@ -122,10 +115,7 @@ class GymStyleLifeApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
             ),
-            textStyle: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
         ),
         switchTheme: SwitchThemeData(
@@ -135,17 +125,14 @@ class GymStyleLifeApp extends StatelessWidget {
           }),
           trackColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return AppColors.gold.withOpacity(0.35);
+              return AppColors.gold.withValues(alpha: 0.35);
             }
             return AppColors.border;
           }),
         ),
         snackBarTheme: SnackBarThemeData(
           backgroundColor: AppColors.card,
-          contentTextStyle: const TextStyle(
-            color: AppColors.text,
-            fontWeight: FontWeight.w600,
-          ),
+          contentTextStyle: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w600),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
             side: const BorderSide(color: AppColors.border),
@@ -154,22 +141,23 @@ class GymStyleLifeApp extends StatelessWidget {
         ),
       ),
       home: const LoginPage(),
+    ),
     );
   }
 }
 
 class AppColors {
-  static const Color background = Color(0xFF0B0B0C);
-  static const Color card = Color(0xFF151517);
-  static const Color input = Color(0xFF1D1D21);
-  static const Color border = Color(0xFF2B2B31);
-  static const Color gold = Color(0xFFD4AF37);
-  static const Color goldSoft = Color(0xFFF0D77A);
-  static const Color success = Color(0xFF22C55E);
-  static const Color danger = Color(0xFFEF4444);
+  static const Color background = Color(0xFF060608);
+  static const Color card = Color(0xFF101014);
+  static const Color input = Color(0xFF18181D);
+  static const Color border = Color(0xFF22222A);
+  static const Color gold = Color(0xFFF59E0B);
+  static const Color goldSoft = Color(0xFFFCD34D);
+  static const Color success = Color(0xFF10B981);
+  static const Color danger = Color(0xFFF43F5E);
   static const Color warning = Color(0xFFF59E0B);
-  static const Color text = Color(0xFFF8F8F8);
-  static const Color textSoft = Color(0xFFB8B8BE);
+  static const Color text = Color(0xFFFDFDFD);
+  static const Color textSoft = Color(0xFFA1A1AA);
 }
 
 class ApiConfig {
@@ -183,6 +171,7 @@ class UserSession {
   final String rol;
   final int? clienteId;
   final bool activo;
+  final String? token;
 
   UserSession({
     required this.id,
@@ -191,17 +180,70 @@ class UserSession {
     required this.rol,
     required this.clienteId,
     required this.activo,
+    this.token,
   });
 
   factory UserSession.fromJson(Map<String, dynamic> json) {
     return UserSession(
-      id: json['id'],
+      id: json['id'] ?? 0,
       nombre: json['nombre'] ?? '',
       username: json['username'] ?? '',
       rol: (json['rol'] ?? '').toString().toUpperCase(),
       clienteId: json['cliente_id'],
       activo: json['activo'] ?? false,
+      token: json['token'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'username': username,
+      'rol': rol,
+      'cliente_id': clienteId,
+      'activo': activo,
+      'token': token,
+    };
+  }
+
+  static Future<UserSession?> loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastActivity = prefs.getInt('last_activity_time');
+    
+    if (lastActivity != null) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - lastActivity < 7200000) {
+        final sessionStr = prefs.getString('session_data');
+        if (sessionStr != null) {
+          await updateActivity();
+          return UserSession.fromJson(jsonDecode(sessionStr));
+        }
+      } else {
+        await clearSession();
+      }
+    }
+    return null;
+  }
+
+  static Future<void> loadSession() async {
+    await loadFromPrefs();
+  }
+
+  Future<void> saveToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('session_data', jsonEncode(toJson()));
+    await updateActivity();
+  }
+
+  static Future<void> updateActivity() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_activity_time', DateTime.now().millisecondsSinceEpoch);
+  }
+
+  static Future<void> clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 }
 
@@ -505,6 +547,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final session = UserSession.fromJson(data);
+        await session.saveToPrefs();
 
         if (!mounted) return;
 
@@ -527,7 +570,7 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     } catch (e) {
-      setState(() => _mensaje = 'Error de conexión: $e');
+      setState(() => _mensaje = 'Sin conexión al servidor. Verifica tu red.');
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -744,7 +787,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
       await cargarUsuarios();
       await cargarAlertasMensualidades(silencioso: true);
       if (_cliente != null) {
-        await recargarClienteActual();
+        await recargarClienteActual(silencioso: true);
       }
     });
   }
@@ -768,55 +811,65 @@ class _AdminHomePageState extends State<AdminHomePage> {
     } catch (_) {}
   }
 
-  Future<void> buscarClientePorCedula() async {
-    final cedula = _cedulaController.text.trim();
+  Future<void> buscarClientePorCedula({bool silencioso = false, String? overrideCedula}) async {
+    final cedula = overrideCedula ?? _cedulaController.text.trim();
 
     if (cedula.isEmpty) {
-      setState(() {
-        _mensaje = 'Debes ingresar una cédula.';
-        _cliente = null;
-        _membresias = [];
-      });
+      if (!silencioso) {
+        setState(() {
+          _mensaje = 'Debes ingresar una cédula.';
+          _cliente = null;
+          _membresias = [];
+        });
+      }
       return;
     }
 
-    setState(() {
-      _cargando = true;
-      _mensaje = '';
-      _cliente = null;
-      _membresias = [];
-    });
+    if (!silencioso) {
+      setState(() {
+        _cargando = true;
+        _mensaje = '';
+        _cliente = null;
+        _membresias = [];
+      });
+    }
 
     try {
       final clienteResp = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/clientes/por-cedula/$cedula'),
-      );
+      ).timeout(const Duration(seconds: 7));
 
       if (clienteResp.statusCode == 404) {
-        setState(() {
-          _mensaje = 'No se encontró un cliente con esa cédula.';
-          _cargando = false;
-        });
+        if (!silencioso) {
+          setState(() {
+            _mensaje = 'No se encontró un cliente con esa cédula.';
+            _cargando = false;
+          });
+        }
         return;
       }
 
       if (clienteResp.statusCode != 200) {
-        setState(() {
-          _mensaje = 'No se pudo consultar la API de clientes.';
-          _cargando = false;
-        });
+        if (!silencioso) {
+          setState(() {
+            _mensaje = 'No se pudo consultar la API de clientes.';
+            _cargando = false;
+          });
+        }
         return;
       }
 
       final Map<String, dynamic> clienteEncontrado =
           Map<String, dynamic>.from(jsonDecode(clienteResp.body));
 
-      final membresiasResp =
-          await http.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
+      final membresiasResp = await http
+          .get(Uri.parse('${ApiConfig.baseUrl}/membresias/?cliente_id=${clienteEncontrado['id']}'))
+          .timeout(const Duration(seconds: 7));
 
       List<dynamic> membresiasCliente = [];
       if (membresiasResp.statusCode == 200) {
         final List<dynamic> todas = jsonDecode(membresiasResp.body);
+        // El backend puede devolver ya filtrado o no según si soporta ?cliente_id
         membresiasCliente = todas
             .where((m) => m['cliente_id'] == clienteEncontrado['id'])
             .toList();
@@ -824,17 +877,25 @@ class _AdminHomePageState extends State<AdminHomePage> {
             .sort((a, b) => (b['id'] ?? 0).compareTo(a['id'] ?? 0));
       }
 
-      setState(() {
-        _cliente = clienteEncontrado;
-        _membresias = membresiasCliente;
-        _mensaje = '';
-        _cargando = false;
-      });
+      if (mounted) {
+        setState(() {
+          _cliente = clienteEncontrado;
+          _membresias = membresiasCliente;
+          _mensaje = '';
+          _cargando = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _mensaje = 'Error de conexión: $e';
-        _cargando = false;
-      });
+      if (mounted && !silencioso) {
+        setState(() {
+          if (e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {
+            _mensaje = 'Sin conexión a internet. Revisa tu red.';
+          } else {
+            _mensaje = 'Error de conexión con el servidor.';
+          }
+          _cargando = false;
+        });
+      }
     }
   }
 
@@ -1687,11 +1748,172 @@ class _AdminHomePageState extends State<AdminHomePage> {
     );
   }
 
-  Future<void> recargarClienteActual() async {
+  Future<void> recargarClienteActual({bool silencioso = false}) async {
     if (_cliente == null) return;
-    _cedulaController.text = (_cliente!['documento'] ?? '').toString();
-    await buscarClientePorCedula();
+    if (!silencioso) {
+      _cedulaController.text = (_cliente!['documento'] ?? '').toString();
+    }
+    await buscarClientePorCedula(silencioso: silencioso, overrideCedula: (_cliente!['documento'] ?? '').toString());
     await cargarUsuarios();
+  }
+
+  Future<void> abrirModalRegalarPromocion() async {
+    if (_cliente == null) return;
+    
+    List<dynamic> promociones = [];
+    bool cargandoPromos = true;
+    bool cargandoAsignacion = false;
+    
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            if (cargandoPromos) {
+              // Cargar promociones e historial de canjes en paralelo
+              Future.wait([
+                http.get(Uri.parse('${ApiConfig.baseUrl}/promociones/')),
+                http.get(Uri.parse('${ApiConfig.baseUrl}/promociones/historial/${_cliente!['id']}')),
+              ]).then((responses) {
+                if (responses[0].statusCode == 200 && responses[1].statusCode == 200) {
+                  final List<dynamic> dataPromos = jsonDecode(responses[0].body);
+                  final List<dynamic> dataHistorial = jsonDecode(responses[1].body);
+                  
+                  final Set<int> usedPromoIds = dataHistorial
+                      .map<int>((h) => (h['promocion_id'] ?? 0) as int)
+                      .toSet();
+                  
+                  if (ctx.mounted) {
+                    setStateDialog(() {
+                      promociones = dataPromos.where((p) {
+                        if (p['activa'] != true) return false;
+                        final usosRealizados = p['usos_realizados'] ?? 0;
+                        final limiteUsos = p['limite_usos'];
+                        if (limiteUsos != null && usosRealizados >= limiteUsos) return false;
+                        if (p['un_uso_por_usuario'] == true && usedPromoIds.contains(p['id'])) return false;
+                        return true;
+                      }).toList();
+                      cargandoPromos = false;
+                    });
+                  }
+                } else {
+                  if (ctx.mounted) {
+                    setStateDialog(() {
+                      cargandoPromos = false;
+                    });
+                  }
+                }
+              }).catchError((_) {
+                if (ctx.mounted) {
+                  setStateDialog(() {
+                    cargandoPromos = false;
+                  });
+                }
+              });
+            }
+            
+            return AlertDialog(
+              backgroundColor: AppColors.background,
+              title: Text(
+                'Regalar Promoción a ${_cliente!['nombres']}',
+                style: const TextStyle(color: Colors.white),
+              ),
+              content: cargandoAsignacion
+                  ? const SizedBox(
+                      height: 120,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: AppColors.gold),
+                          SizedBox(height: 12),
+                          Text(
+                            'Procesando beneficio...',
+                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                          )
+                        ],
+                      ),
+                    )
+                  : cargandoPromos
+                      ? const SizedBox(
+                          height: 100,
+                          child: Center(child: CircularProgressIndicator(color: AppColors.gold)),
+                        )
+                      : promociones.isEmpty
+                          ? const Text(
+                              'No hay promociones activas o disponibles para este cliente.\nCrea una nueva en la pestaña de Promociones.',
+                              style: TextStyle(color: Colors.white70),
+                            )
+                          : SizedBox(
+                              width: 400,
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: promociones.length,
+                                itemBuilder: (ctx2, idx) {
+                                  final p = promociones[idx];
+                                  return Card(
+                                    color: AppColors.card,
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      title: Text(p['nombre'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      subtitle: Text(p['descripcion'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.gold),
+                                      onTap: () async {
+                                        setStateDialog(() {
+                                          cargandoAsignacion = true;
+                                        });
+                                        
+                                        try {
+                                          final res = await http.post(
+                                            Uri.parse('${ApiConfig.baseUrl}/promociones/asignar-manual'),
+                                            headers: {'Content-Type': 'application/json'},
+                                            body: jsonEncode({
+                                              'cliente_id': _cliente!['id'],
+                                              'promocion_id': p['id'],
+                                              'observacion': 'Asignado directamente desde panel administrador.',
+                                            }),
+                                          );
+                                          if (res.statusCode == 200) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('¡Promoción asignada correctamente!')),
+                                            );
+                                            await recargarClienteActual();
+                                            if (ctx.mounted) {
+                                              Navigator.pop(ctx); // Cerrar diálogo solo al terminar la actualización
+                                            }
+                                          } else {
+                                            final err = jsonDecode(res.body)['detail'] ?? 'Error al asignar';
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('Error: $err')),
+                                            );
+                                            setStateDialog(() {
+                                              cargandoAsignacion = false;
+                                            });
+                                          }
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Error de red: $e')),
+                                          );
+                                          setStateDialog(() {
+                                            cargandoAsignacion = false;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+              actions: [
+                TextButton(
+                  onPressed: cargandoAsignacion ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> abrirWhatsApp() async {
@@ -1703,6 +1925,53 @@ class _AdminHomePageState extends State<AdminHomePage> {
     if (_cliente == null) return false;
     final idCliente = _cliente!['id'];
     return _usuarios.any((u) => u['cliente_id'] == idCliente);
+  }
+
+  Future<void> eliminarCliente() async {
+    if (_cliente == null) return;
+    
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar cliente?'),
+        content: Text('Estás a punto de eliminar permanentemente a ${_cliente!['nombres']} ${_cliente!['apellidos']} y todos sus registros (membresías, pagos, rutinas, etc.). Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sí, eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _cargando = true);
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/clientes/${_cliente!['id']}/eliminar-completo'),
+      );
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        setState(() {
+          _cliente = null;
+          _cedulaController.clear();
+          _mensaje = 'Cliente eliminado exitosamente.';
+        });
+      } else {
+        setState(() {
+          _mensaje = 'Error al eliminar cliente: ${res.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() => _mensaje = 'Error de red: $e');
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
   }
 
   Future<void> abrirModalCrearUsuarioCliente() async {
@@ -2445,12 +2714,86 @@ class _AdminHomePageState extends State<AdminHomePage> {
                           icon: const Icon(Icons.attach_money),
                           label: const Text('Pago'),
                         ),
+                        FilledButton.icon(
+                          onPressed: abrirModalRegalarPromocion,
+                          icon: const Icon(Icons.celebration),
+                          label: const Text('Aplicar Promoción'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.gold,
+                            foregroundColor: Colors.black,
+                          ),
+                        ),
+                        if (widget.session.username.toLowerCase() == 'admin')
+                          FilledButton.icon(
+                            onPressed: _cargando ? null : eliminarCliente,
+                            icon: const Icon(Icons.delete_forever),
+                            label: const Text('Eliminar cliente'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.danger,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                       ],
                     ),
                   ],
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  
+  Future<void> abrirModalModificarFechas() async {
+    final membresia = obtenerMembresiaPrincipal();
+    if (_cliente == null || membresia == null) return;
+    
+    final ctrlInicio = TextEditingController(text: membresia['fecha_inicio']?.split('T')[0] ?? '');
+    final ctrlFin = TextEditingController(text: membresia['fecha_fin']?.split('T')[0] ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Forzar Fechas Membresía'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Solo SUPER ADMIN.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            TextField(controller: ctrlInicio, decoration: const InputDecoration(labelText: 'Fecha Inicio (YYYY-MM-DD)')),
+            const SizedBox(height: 10),
+            TextField(controller: ctrlFin, decoration: const InputDecoration(labelText: 'Fecha Fin (YYYY-MM-DD)')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () async {
+              try {
+                final url = '${ApiConfig.baseUrl}/membresias/${membresia['id']}';
+                final res = await http.put(
+                  Uri.parse(url),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'fecha_inicio': ctrlInicio.text,
+                    'fecha_fin': ctrlFin.text,
+                  }),
+                );
+                if (res.statusCode == 200) {
+                  Navigator.pop(ctx);
+                  recargarClienteActual();
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fechas actualizadas')));
+                } else {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res.body}')));
+                }
+              } catch(e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Aplicar Fechas'),
+          )
         ],
       ),
     );
@@ -2468,7 +2811,17 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = [clientesTab(), mensualidadesTab(), medidasTab(), rutinasTab()];
+    final esSuperAdmin = widget.session.username == 'admin';
+    final tabs = [
+      clientesTab(),
+      mensualidadesTab(),
+      medidasTab(),
+      rutinasTab(),
+      AdminAutomationTab(baseUrl: ApiConfig.baseUrl),
+      AdminPromotionsTab(baseUrl: ApiConfig.baseUrl),
+      if (esSuperAdmin) AdminStaffTab(baseUrl: ApiConfig.baseUrl),
+      if (esSuperAdmin) const AdminSettingsTab(),
+    ];
     final esDesktop = AppResponsive.isDesktop(context);
 
     return Scaffold(
@@ -2506,6 +2859,34 @@ class _AdminHomePageState extends State<AdminHomePage> {
             ),
           ),
           IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => scale_module.ScaleDebugScreen(
+                    baseUrl: ApiConfig.baseUrl,
+                    cliente: _cliente,
+                    isAdmin: widget.session.rol == 'ADMIN',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.bluetooth_searching, color: AppColors.gold),
+            tooltip: 'Báscula BLE',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WhatsAppControlScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.gold),
+            tooltip: 'WhatsApp',
+          ),
+          IconButton(
             onPressed: cerrarSesion,
             icon: const Icon(Icons.logout, color: AppColors.text),
           ),
@@ -2533,7 +2914,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                       fontWeight: FontWeight.w700,
                     ),
                     indicatorColor: AppColors.gold,
-                    destinations: const [
+                    destinations: [
                       NavigationRailDestination(
                         icon: Icon(Icons.people, color: AppColors.textSoft),
                         label: Text('Clientes'),
@@ -2550,6 +2931,24 @@ class _AdminHomePageState extends State<AdminHomePage> {
                         icon: Icon(Icons.auto_awesome, color: AppColors.textSoft),
                         label: Text('Rutinas'),
                       ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.schedule, color: AppColors.textSoft),
+                        label: Text('Automatización'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.card_giftcard, color: AppColors.textSoft),
+                        label: Text('Promociones'),
+                      ),
+                      if (esSuperAdmin)
+                        NavigationRailDestination(
+                          icon: Icon(Icons.admin_panel_settings, color: AppColors.textSoft),
+                          label: Text('Staff'),
+                        ),
+                      if (esSuperAdmin)
+                        NavigationRailDestination(
+                          icon: Icon(Icons.settings_outlined, color: AppColors.textSoft),
+                          label: Text('Config'),
+                        ),
                     ],
                   ),
                 ),
@@ -2565,18 +2964,71 @@ class _AdminHomePageState extends State<AdminHomePage> {
           : tabs[_tabIndex],
       bottomNavigationBar: esDesktop
           ? null
-          : NavigationBar(
-              backgroundColor: AppColors.card,
-              indicatorColor: AppColors.gold.withOpacity(0.18),
-              selectedIndex: _tabIndex,
-              onDestinationSelected: (v) => setState(() => _tabIndex = v),
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.people), label: 'Clientes'),
-                NavigationDestination(icon: Icon(Icons.warning_amber_rounded), label: 'Mensualidades'),
-                NavigationDestination(icon: Icon(Icons.monitor_weight), label: 'Medidas'),
-                NavigationDestination(icon: Icon(Icons.auto_awesome), label: 'Rutinas'),
-              ],
+          : Container(
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    children: [
+                      _buildNavItem(0, Icons.people, 'Clientes'),
+                      _buildNavItem(1, Icons.warning_amber_rounded, 'Alertas'),
+                      _buildNavItem(2, Icons.monitor_weight, 'Medidas'),
+                      _buildNavItem(3, Icons.auto_awesome, 'Rutinas'),
+                      _buildNavItem(4, Icons.schedule, 'Automati\nzación'),
+                      _buildNavItem(5, Icons.card_giftcard, 'Promo\nciones'),
+                      if (esSuperAdmin)
+                        _buildNavItem(6, Icons.admin_panel_settings, 'Staff'),
+                      if (esSuperAdmin)
+                        _buildNavItem(tabs.length - 1, Icons.settings_outlined, 'Config'),
+                    ],
+                  ),
+                ),
+              ),
             ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _tabIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _tabIndex = index),
+      child: Container(
+        width: 72,
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.gold.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected ? AppColors.gold : AppColors.textSoft,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? AppColors.gold : AppColors.textSoft,
+                height: 1.1,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2644,6 +3096,7 @@ class _NuevoIngresoPageState extends State<NuevoIngresoPage> {
   bool guardarMedidas = true;
   bool cargando = false;
   String mensaje = '';
+  int? _clienteIdCreado;
 
   InputDecoration _dec(
     String label,
@@ -2795,40 +3248,47 @@ class _NuevoIngresoPageState extends State<NuevoIngresoPage> {
     });
 
     try {
-      final clienteResp = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/clientes/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'tipo_documento': tipoDocumento.text.trim().isEmpty ? 'CC' : tipoDocumento.text.trim(),
-          'documento': documento.text.trim(),
-          'nombres': nombres.text.trim(),
-          'apellidos': apellidos.text.trim(),
-          'fecha_nacimiento': fechaNacimiento.text.trim().isEmpty ? null : fechaNacimiento.text.trim(),
-          'genero': _generoFinal(),
-          'telefono': telefono.text.trim().isEmpty ? null : telefono.text.trim(),
-          'whatsapp': whatsapp.text.trim().isEmpty ? null : whatsapp.text.trim(),
-          'email': email.text.trim().isEmpty ? null : email.text.trim(),
-          'direccion': direccion.text.trim().isEmpty ? null : direccion.text.trim(),
-          'contacto_emergencia_nombre': contactoEmergenciaNombre.text.trim().isEmpty ? null : contactoEmergenciaNombre.text.trim(),
-          'contacto_emergencia_telefono': contactoEmergenciaTelefono.text.trim().isEmpty ? null : contactoEmergenciaTelefono.text.trim(),
-          'foto_url': null,
-          'fecha_ingreso': fechaIngreso.text.trim(),
-          'estado': estado.text.trim().isEmpty ? 'ACTIVO' : estado.text.trim(),
-          'observaciones': observacionesCliente.text.trim().isEmpty ? null : observacionesCliente.text.trim(),
-        }),
-      );
+      int clienteId;
+      
+      if (_clienteIdCreado != null) {
+        clienteId = _clienteIdCreado!;
+      } else {
+        final clienteResp = await http.post(
+          Uri.parse('${ApiConfig.baseUrl}/clientes/'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'tipo_documento': tipoDocumento.text.trim().isEmpty ? 'CC' : tipoDocumento.text.trim(),
+            'documento': documento.text.trim(),
+            'nombres': nombres.text.trim(),
+            'apellidos': apellidos.text.trim(),
+            'fecha_nacimiento': fechaNacimiento.text.trim().isEmpty ? null : fechaNacimiento.text.trim(),
+            'genero': _generoFinal(),
+            'telefono': telefono.text.trim().isEmpty ? null : telefono.text.trim(),
+            'whatsapp': whatsapp.text.trim().isEmpty ? null : whatsapp.text.trim(),
+            'email': email.text.trim().isEmpty ? null : email.text.trim(),
+            'direccion': direccion.text.trim().isEmpty ? null : direccion.text.trim(),
+            'contacto_emergencia_nombre': contactoEmergenciaNombre.text.trim().isEmpty ? null : contactoEmergenciaNombre.text.trim(),
+            'contacto_emergencia_telefono': contactoEmergenciaTelefono.text.trim().isEmpty ? null : contactoEmergenciaTelefono.text.trim(),
+            'foto_url': null,
+            'fecha_ingreso': fechaIngreso.text.trim(),
+            'estado': estado.text.trim().isEmpty ? 'ACTIVO' : estado.text.trim(),
+            'observaciones': observacionesCliente.text.trim().isEmpty ? null : observacionesCliente.text.trim(),
+          }),
+        );
 
-      final clienteBody = clienteResp.body.isNotEmpty ? jsonDecode(clienteResp.body) : {};
-      if (clienteResp.statusCode < 200 || clienteResp.statusCode >= 300) {
-        setState(() {
-          mensaje = clienteBody is Map && clienteBody['detail'] != null
-              ? clienteBody['detail'].toString()
-              : 'No se pudo crear el cliente.';
-        });
-        return;
+        final clienteBody = clienteResp.body.isNotEmpty ? jsonDecode(clienteResp.body) : {};
+        if (clienteResp.statusCode < 200 || clienteResp.statusCode >= 300) {
+          setState(() {
+            mensaje = clienteBody is Map && clienteBody['detail'] != null
+                ? clienteBody['detail'].toString()
+                : 'No se pudo crear el cliente.';
+          });
+          return;
+        }
+
+        clienteId = clienteBody['id'];
+        _clienteIdCreado = clienteId;
       }
-
-      final int clienteId = clienteBody['id'];
 
       if (guardarMedidas) {
         final imcValor = _calcImc();
@@ -4051,6 +4511,10 @@ class _ClientHomePageState extends State<ClientHomePage> {
   List<dynamic> _membresias = [];
   List<dynamic> _evaluaciones = [];
   Map<String, dynamic>? _rutinaActual;
+  List<dynamic> _historialPromociones = [];
+  bool _cargandoPromociones = false;
+  final TextEditingController _codigoPromoCtrl = TextEditingController();
+  bool _canjeando = false;
 
   static const Map<int, String> planesNombre = {
     1: 'DIARIO',
@@ -4078,6 +4542,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _codigoPromoCtrl.dispose();
     super.dispose();
   }
 
@@ -4220,9 +4685,14 @@ class _ClientHomePageState extends State<ClientHomePage> {
         _rutinaActual = rutinaData;
         _cargando = false;
       });
+      _cargarHistorialPromociones();
     } catch (e) {
       setState(() {
-        _mensaje = 'Error de conexión: $e';
+        if (e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {
+          _mensaje = 'Sin conexión a internet. Revisa tu red.';
+        } else {
+          _mensaje = 'Error de conexión con el servidor.';
+        }
         _cargando = false;
       });
     }
@@ -4543,6 +5013,213 @@ class _ClientHomePageState extends State<ClientHomePage> {
     );
   }
 
+  Future<void> _cargarHistorialPromociones() async {
+    if (_cliente == null) return;
+    setState(() => _cargandoPromociones = true);
+    try {
+      final resp = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/promociones/historial/${_cliente!['id']}'),
+      );
+      if (resp.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(resp.body);
+        setState(() => _historialPromociones = data);
+      }
+    } catch (e) {
+      debugPrint('Error cargando historial de promociones: $e');
+    } finally {
+      setState(() => _cargandoPromociones = false);
+    }
+  }
+
+  Widget promocionesTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            color: AppColors.card,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Canjear Código Promocional',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Ingresa un código cupón válido para recibir membresía gratis, descuentos o beneficios especiales de inmediato.',
+                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _codigoPromoCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Código de Regalo (Ej: PROMO30)',
+                            labelStyle: TextStyle(color: Colors.white54),
+                          ),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _canjeando ? null : () async {
+                          final code = _codigoPromoCtrl.text.trim();
+                          if (code.isEmpty) return;
+                          setState(() => _canjeando = true);
+                          try {
+                            final resp = await http.post(
+                              Uri.parse('${ApiConfig.baseUrl}/promociones/canjear'),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({
+                                'cliente_id': _cliente!['id'],
+                                'codigo': code,
+                              }),
+                            );
+                            if (resp.statusCode == 200) {
+                              _codigoPromoCtrl.clear();
+                              _cargarHistorialPromociones();
+                              cargarDatosCliente(silencioso: true);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('¡Código canjeado exitosamente!')),
+                              );
+                            } else {
+                              final err = jsonDecode(resp.body)['detail'] ?? 'Error al canjear';
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $err')),
+                              );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error de red: $e')),
+                            );
+                          } finally {
+                            setState(() => _canjeando = false);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.gold,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        ),
+                        child: _canjeando
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Canjear'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Mis Beneficios y Regalos',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          _cargandoPromociones
+              ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+              : _historialPromociones.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Text(
+                          'Aún no tienes beneficios registrados.\n¡Utiliza un código arriba para canjear tu primer regalo!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white38),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _historialPromociones.length,
+                      itemBuilder: (ctx, i) {
+                        final h = _historialPromociones[i];
+                        final promo = h['promocion'] ?? {};
+                        final name = promo['nombre'] ?? 'Beneficio Especial';
+                        final desc = promo['descripcion'] ?? '';
+                        final fecha = h['fecha_canje'] != null
+                            ? DateTime.parse(h['fecha_canje']).toLocal().toString().substring(0, 10)
+                            : '';
+                        final observacion = h['observacion'] ?? '';
+                        final estado = h['estado'] ?? 'USADO';
+                        
+                        Color badgeColor = Colors.green;
+                        if (estado == 'PENDIENTE') badgeColor = Colors.orange;
+                        if (estado == 'VENCIDO') badgeColor = Colors.red;
+
+                        return Card(
+                          color: AppColors.card,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: badgeColor.withOpacity(0.15),
+                                        border: Border.all(color: badgeColor),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        estado,
+                                        style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 11),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (desc.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                ],
+                                const SizedBox(height: 12),
+                                Divider(color: Colors.white.withOpacity(0.08), height: 1),
+                                const SizedBox(height: 12),
+                                Text(
+                                  observacion,
+                                  style: const TextStyle(color: AppColors.gold, fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Text(
+                                    'Canjeado: $fecha',
+                                    style: const TextStyle(color: Colors.white30, fontSize: 11),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+        ],
+      ),
+    );
+  }
+
   Widget medidasTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -4799,7 +5476,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final tabs = [cuentaTab(), medidasTab(), rutinaTab()];
+    final tabs = [cuentaTab(), medidasTab(), rutinaTab(), promocionesTab()];
     final esDesktop = AppResponsive.isDesktop(context);
 
     return Scaffold(
@@ -4816,6 +5493,22 @@ class _ClientHomePageState extends State<ClientHomePage> {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => scale_module.ScaleDebugScreen(
+                    baseUrl: ApiConfig.baseUrl,
+                    cliente: _cliente,
+                    isAdmin: widget.session.rol == 'ADMIN',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.bluetooth_searching, color: AppColors.gold),
+            tooltip: 'Báscula BLE',
+          ),
           IconButton(
             onPressed: cerrarSesion,
             icon: const Icon(Icons.logout, color: AppColors.text),
@@ -4846,7 +5539,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
                           fontWeight: FontWeight.w700,
                         ),
                         indicatorColor: AppColors.gold,
-                        destinations: const [
+                        destinations: [
                           NavigationRailDestination(
                             icon: Icon(Icons.person, color: AppColors.textSoft),
                             label: Text('Cuenta'),
@@ -4858,6 +5551,10 @@ class _ClientHomePageState extends State<ClientHomePage> {
                           NavigationRailDestination(
                             icon: Icon(Icons.fitness_center, color: AppColors.textSoft),
                             label: Text('Rutina'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.card_giftcard, color: AppColors.textSoft),
+                            label: Text('Regalos'),
                           ),
                         ],
                       ),
@@ -4879,12 +5576,460 @@ class _ClientHomePageState extends State<ClientHomePage> {
               indicatorColor: AppColors.gold.withOpacity(0.18),
               selectedIndex: _tabIndex,
               onDestinationSelected: (v) => setState(() => _tabIndex = v),
-              destinations: const [
+              destinations: [
                 NavigationDestination(icon: Icon(Icons.person), label: 'Cuenta'),
                 NavigationDestination(icon: Icon(Icons.monitor_weight), label: 'Medidas'),
                 NavigationDestination(icon: Icon(Icons.fitness_center), label: 'Rutina'),
+                NavigationDestination(icon: Icon(Icons.card_giftcard), label: 'Regalos'),
               ],
             ),
+    );
+  }
+}
+
+
+class AdminStaffTab extends StatefulWidget {
+  final String baseUrl;
+  const AdminStaffTab({Key? key, required this.baseUrl}) : super(key: key);
+
+  @override
+  State<AdminStaffTab> createState() => _AdminStaffTabState();
+}
+
+class _AdminStaffTabState extends State<AdminStaffTab> {
+  bool _cargando = true;
+  List<dynamic> _usuarios = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarUsuarios();
+  }
+
+  Future<void> _cargarUsuarios() async {
+    setState(() => _cargando = true);
+    try {
+      final res = await http.get(Uri.parse('${widget.baseUrl}/usuarios'));
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body) as List;
+        setState(() {
+          _usuarios = list.where((u) => u['rol'] != 'CLIENTE').toList();
+        });
+      }
+    } catch (e) {
+      debugPrint(e.toString());
+    } finally {
+      setState(() => _cargando = false);
+    }
+  }
+
+  Future<void> _abrirModalCrear() async {
+    final ctrlNombre = TextEditingController();
+    final ctrlUser = TextEditingController();
+    final ctrlPass = TextEditingController();
+    String? rolSeleccionado;
+    
+    final rolesMap = {
+      'ADMIN': 1,
+      'RECEPCION': 2,
+      'ENTRENADOR': 3,
+    };
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Crear Usuario Staff'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: ctrlNombre, decoration: const InputDecoration(labelText: 'Nombre Completo')),
+              const SizedBox(height: 10),
+              TextField(controller: ctrlUser, decoration: const InputDecoration(labelText: 'Username')),
+              const SizedBox(height: 10),
+              TextField(controller: ctrlPass, decoration: const InputDecoration(labelText: 'Password'), obscureText: true),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: 'Rol'),
+                items: rolesMap.keys.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                onChanged: (v) => setState(() => rolSeleccionado = v),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () async {
+              if (ctrlNombre.text.isEmpty || ctrlUser.text.isEmpty || ctrlPass.text.isEmpty || rolSeleccionado == null) return;
+              try {
+                final res = await http.post(
+                  Uri.parse('${widget.baseUrl}/usuarios/staff'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'nombre': ctrlNombre.text,
+                    'username': ctrlUser.text,
+                    'password': ctrlPass.text,
+                    'rol_id': rolesMap[rolSeleccionado]
+                  }),
+                );
+                if (res.statusCode == 200) {
+                  Navigator.pop(ctx);
+                  _cargarUsuarios();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${res.body}')));
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Guardar'),
+          )
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) return const Center(child: CircularProgressIndicator());
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _abrirModalCrear,
+        backgroundColor: AppColors.gold,
+        child: const Icon(Icons.add, color: Colors.black),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _usuarios.length,
+        itemBuilder: (ctx, i) {
+          final u = _usuarios[i];
+          return Card(
+            color: AppColors.card,
+            child: ListTile(
+              leading: const Icon(Icons.admin_panel_settings, color: AppColors.gold),
+              title: Text(u['nombre'], style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.bold)),
+              subtitle: Text('Usuario: ${u['username']} - Rol: ${u['rol']}', style: const TextStyle(color: AppColors.textSoft)),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class WhatsAppControlScreen extends StatefulWidget {
+  const WhatsAppControlScreen({super.key});
+
+  @override
+  State<WhatsAppControlScreen> createState() => _WhatsAppControlScreenState();
+}
+
+class _WhatsAppControlScreenState extends State<WhatsAppControlScreen> {
+  String _status = 'LOADING';
+  bool _hasQr = false;
+  String? _qrBase64;
+  Uint8List? _qrBytes;
+  String? _error;
+  bool _checking = false;
+  Timer? _timer;
+
+  final _phoneCtrl = TextEditingController();
+  final _msgCtrl = TextEditingController();
+  bool _sendingTest = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _checkStatus());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _phoneCtrl.dispose();
+    _msgCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkStatus() async {
+    if (_checking) return;
+    _checking = true;
+    try {
+      final res = await ApiClient.get(Uri.parse('${ApiConfig.baseUrl}/whatsapp/status'));
+      if (res.statusCode != 200) {
+        throw Exception('El servidor respondió HTTP ${res.statusCode}');
+      }
+
+      final data = jsonDecode(res.body);
+      final newStatus = (data['status'] ?? 'INITIALIZING').toString();
+      final newHasQr = data['hasQr'] == true;
+      final newQrBase64 = data['qrBase64'] as String?;
+
+      if (mounted) {
+        setState(() {
+          _status = newStatus;
+          _hasQr = newStatus == 'CONNECTED' ? false : newHasQr;
+          _error = null;
+          if (newStatus == 'CONNECTED') {
+            _qrBytes = null;
+            _qrBase64 = null;
+          } else if (newQrBase64 != null) {
+            _qrBase64 = newQrBase64;
+            _qrBytes = base64Decode(newQrBase64);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _status = 'DISCONNECTED';
+          _error = 'No se pudo actualizar el estado: $e';
+        });
+      }
+    } finally {
+      _checking = false;
+    }
+  }
+
+  Future<void> _loadQr({bool force = false, int? version}) async {
+    await _checkStatus();
+  }
+
+  Future<void> _enviarPrueba() async {
+    final phone = _phoneCtrl.text.trim();
+    final message = _msgCtrl.text.trim();
+    if (phone.isEmpty || message.isEmpty) {
+      _mostrarSnack('Completa los campos de prueba', esError: true);
+      return;
+    }
+    setState(() => _sendingTest = true);
+    try {
+      final res = await ApiClient.post(
+        Uri.parse('${ApiConfig.baseUrl}/whatsapp/enviar-prueba'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'message': message,
+        }),
+      );
+      if (res.statusCode == 200) {
+        _phoneCtrl.clear();
+        _msgCtrl.clear();
+        _mostrarSnack('¡Mensaje de prueba enviado con éxito!');
+      } else {
+        String detail = res.body;
+        try {
+          final data = jsonDecode(res.body);
+          detail = data['detail'] ?? res.body;
+        } catch (_) {}
+        _mostrarSnack('Error: $detail', esError: true);
+      }
+    } catch (e) {
+      _mostrarSnack('Error al enviar: $e', esError: true);
+    } finally {
+      if (mounted) setState(() => _sendingTest = false);
+    }
+  }
+
+  void _mostrarSnack(String msg, {bool esError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: esError ? Colors.red.shade900 : Colors.green.shade900,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1117),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF161B22),
+        title: const Text('Configuración de WhatsApp'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Card(
+              color: const Color(0xFF161B22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Estado de la Conexión',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatusBadge(),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_status == 'QR_READY' || _hasQr) _buildQrSection(),
+            if (_status == 'CONNECTED') _buildTestSection(),
+            if (_status == 'DISCONNECTED' && !_hasQr)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Text(
+                    'Esperando código QR o inicialización del servicio...',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge() {
+    Color color;
+    String label;
+    switch (_status) {
+      case 'LOADING':
+        color = Colors.grey;
+        label = 'CARGANDO ESTADO...';
+        break;
+      case 'INITIALIZING':
+        color = Colors.blue;
+        label = 'INICIALIZANDO...';
+        break;
+      case 'CONNECTED':
+        color = Colors.green;
+        label = 'CONECTADO';
+        break;
+      case 'QR_READY':
+        color = Colors.orange;
+        label = 'ESPERANDO ESCANEO';
+        break;
+      case 'AUTHENTICATING':
+        color = Colors.blue;
+        label = 'AUTENTICANDO...';
+        break;
+      default:
+        color = Colors.red;
+        label = 'DESCONECTADO';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
+      ),
+    );
+  }
+
+  Widget _buildQrSection() {
+    return Column(
+      children: [
+        const Text(
+          'Escanea este código QR con WhatsApp:',
+          style: TextStyle(fontSize: 16, color: Colors.white70),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: _qrBytes != null
+              ? Image.memory(
+                  _qrBytes!,
+                  width: 250,
+                  height: 250,
+                  gaplessPlayback: true,
+                )
+              : const SizedBox(
+                  width: 250,
+                  height: 250,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () async {
+            await _checkStatus();
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Actualizar QR'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTestSection() {
+    return Card(
+      color: const Color(0xFF161B22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Colors.white12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enviar Mensaje de Prueba',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _phoneCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Número de Teléfono (con indicativo, ej: 57312...)',
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _msgCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Mensaje de texto',
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _sendingTest ? null : _enviarPrueba,
+              child: _sendingTest
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Enviar Mensaje'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

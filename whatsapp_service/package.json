@@ -1,0 +1,15 @@
+{
+  "name": "whatsapp-service",
+  "version": "1.0.0",
+  "description": "Microservicio local para envio automatico de mensajes por WhatsApp",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qr-image": "^3.2.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

@@ -1,0 +1,126 @@
+Created At: 2026-06-29T00:49:52Z
+Completed At: 2026-06-29T00:49:52Z
+The following changes were made by the replace_file_content tool to: d:\Proyectos\Gimnasio_app\apk\gimnasio_app\lib\main.dart. If relevant, proactively run terminal commands to execute this code for the USER. Don't ask for permission.
+[diff_block_start]
+@@ -5409,4 +5409,313 @@
+     );
+   }
+ }
++
++class WhatsAppControlScreen extends StatefulWidget {
++  const WhatsAppControlScreen({super.key});
++
++  @override
++  State<WhatsAppControlScreen> createState() => _WhatsAppControlScreenState();
++}
++
++class _WhatsAppControlScreenState extends State<WhatsAppControlScreen> {
++  String _status = 'DISCONNECTED';
++  bool _hasQr = false;
++  String? _error;
++  bool _checking = false;
++  Timer? _timer;
++  int _timestamp = DateTime.now().millisecondsSinceEpoch;
++
++  final _phoneCtrl = TextEditingController();
++  final _msgCtrl = TextEditingController();
++  bool _sendingTest = false;
++
++  @override
++  void initState() {
++    super.initState();
++    _checkStatus();
++    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _checkStatus());
++  }
++
++  @override
++  void dispose() {
++    _timer?.cancel();
++    _phoneCtrl.dispose();
++    _msgCtrl.dispose();
++    super.dispose();
++  }
++
++  Future<void> _checkStatus() async {
++    if (_checking) return;
++    if (mounted) setState(() => _checking = true);
++    try {
++      final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/whatsapp/status'));
++      if (res.statusCode == 200) {
++        final data = jsonDecode(res.body);
++        if (mounted) {
++          setState(() {
++            _status = data['status'] ?? 'DISCONNECTED';
++            _hasQr = data['hasQr'] ?? false;
++            _error = null;
++            if (_hasQr) {
++              _timestamp = DateTime.now().millisecondsSinceEpoch;
++            }
++          });
++        }
++      }
++    } catch (e) {
++      if (mounted) {
++        setState(() {
++          _status = 'DISCONNECTED';
++          _hasQ
+<truncated 6596 bytes>
+       label: const Text('Actualizar QR'),
++        ),
++      ],
++    );
++  }
++
++  Widget _buildTestSection() {
++    return Card(
++      color: const Color(0xFF161B22),
++      shape: RoundedRectangleBorder(
++        borderRadius: BorderRadius.circular(16),
++        side: const BorderSide(color: Colors.white12),
++      ),
++      child: Padding(
++        padding: const EdgeInsets.all(20),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.start,
++          children: [
++            const Text(
++              'Enviar Mensaje de Prueba',
++              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
++            ),
++            const SizedBox(height: 16),
++            TextField(
++              controller: _phoneCtrl,
++              decoration: const InputDecoration(
++                labelText: 'Número de Teléfono (con indicativo, ej: 57312...)',
++              ),
++              keyboardType: TextInputType.phone,
++            ),
++            const SizedBox(height: 16),
++            TextField(
++              controller: _msgCtrl,
++              decoration: const InputDecoration(
++                labelText: 'Mensaje de texto',
++              ),
++              maxLines: 2,
++            ),
++            const SizedBox(height: 20),
++            ElevatedButton(
++              onPressed: _sendingTest ? null : _enviarPrueba,
++              child: _sendingTest
++                  ? const SizedBox(
++                      width: 20,
++                      height: 20,
++                      child: CircularProgressIndicator(strokeWidth: 2),
++                    )
++                  : const Text('Enviar Mensaje'),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+ 
+[diff_block_end]
+
+Please note that the above snippet only shows the MODIFIED lines from the last change. It shows up to 3 lines of unchanged lines before and after the modified lines. The actual file contents may have many more lines not shown.

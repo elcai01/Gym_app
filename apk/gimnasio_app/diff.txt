@@ -1,0 +1,101 @@
+﻿diff --git a/apk/gimnasio_app/lib/main.dart b/apk/gimnasio_app/lib/main.dart
+index 2eccf7c..de200b2 100644
+--- a/apk/gimnasio_app/lib/main.dart
++++ b/apk/gimnasio_app/lib/main.dart
+@@ -4,18 +4,24 @@ import 'dart:convert';
+ import 'package:flutter/gestures.dart';
+ import 'package:flutter/material.dart';
+ import 'package:http/http.dart' as http;
++import 'package:shared_preferences/shared_preferences.dart';
+ import 'package:url_launcher/url_launcher.dart';
+ 
+-void main() {
+-  runApp(const GymStyleLifeApp());
++void main() async {
++  WidgetsFlutterBinding.ensureInitialized();
++  final initialSession = await UserSession.loadFromPrefs();
++  runApp(GymStyleLifeApp(initialSession: initialSession));
+ }
+ 
+ class GymStyleLifeApp extends StatelessWidget {
+-  const GymStyleLifeApp({super.key});
++  final UserSession? initialSession;
++  const GymStyleLifeApp({super.key, this.initialSession});
+ 
+   @override
+   Widget build(BuildContext context) {
+-    return MaterialApp(
++    return Listener(
++      onPointerDown: (_) => UserSession.updateActivity(),
++      child: MaterialApp(
+       title: 'Gym Style Life',
+       debugShowCheckedModeBanner: false,
+       scrollBehavior: const AppScrollBehavior(),
+@@ -153,7 +159,12 @@ class GymStyleLifeApp extends StatelessWidget {
+           behavior: SnackBarBehavior.floating,
+         ),
+       ),
+-      home: const LoginPage(),
++      home: initialSession != null
++          ? (initialSession!.rol == 'ADMIN'
++              ? AdminHomePage(session: initialSession!)
++              : ClientHomePage(session: initialSession!))
++          : const LoginPage(),
++    ),
+     );
+   }
+ }
+@@ -203,6 +214,53 @@ class UserSession {
+       activo: json['activo'] ?? false,
+     );
+   }
++
++  Map<String, dynamic> toJson() {
++    return {
++      'id': id,
++      'nombre': nombre,
++      'username': username,
++      'rol': rol,
++      'cliente_id': clienteId,
++      'activo': activo,
++    };
++  }
++
++  static Future<UserSession?> loadFromPrefs() async {
++    final prefs = await SharedPreferences.getInstance();
++    final lastActivity = prefs.getInt('last_activity_time');
++    if (lastActivity != null) {
++      final now = DateTime.now().millisecondsSinceEpoch;
++      if (now - lastActivity < 7200000) {
++        final sessionString = prefs.getString('user_session');
++        if (sessionString != null) {
++          final data = jsonDecode(sessionString);
++          await updateActivity();
++          return UserSession.fromJson(data);
++        }
++      } else {
++        await clearPrefs();
++      }
++    }
++    return null;
++  }
++
++  static Future<void> saveToPrefs(UserSession session) async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setString('user_session', jsonEncode(session.toJson()));
++    await updateActivity();
++  }
++
++  static Future<void> updateActivity() async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.setInt('last_activity_time', DateTime.now().millisecondsSinceEpoch);
++  }
++
++  static Future<void> clearPrefs() async {
++    final prefs = await SharedPreferences.getInstance();
++    await prefs.remove('user_session');
++    await prefs.remove('last_activity_time');
++  }
+ }
+ 
+ 

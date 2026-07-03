@@ -75,8 +75,11 @@ def alertas_membresias(db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=List[MembresiaResponse])
-def listar_membresias(db: Session = Depends(get_db)):
-    return db.query(Membresia).order_by(Membresia.id.desc()).all()
+def listar_membresias(cliente_id: int = None, db: Session = Depends(get_db)):
+    query = db.query(Membresia)
+    if cliente_id is not None:
+        query = query.filter(Membresia.cliente_id == cliente_id)
+    return query.order_by(Membresia.id.desc()).all()
 
 
 @router.get("/{membresia_id}", response_model=MembresiaResponse)

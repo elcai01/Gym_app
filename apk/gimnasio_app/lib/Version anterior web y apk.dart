@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:gimnasio_app/utils/api_client.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -493,7 +494,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}/usuarios/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': usuario, 'password': clave}),
@@ -736,7 +737,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   Future<void> cargarUsuarios() async {
     try {
-      final resp = await http.get(Uri.parse('${ApiConfig.baseUrl}/usuarios'));
+      final resp = await ApiClient.get(Uri.parse('${ApiConfig.baseUrl}/usuarios'));
       if (resp.statusCode == 200) {
         final List<dynamic> data = jsonDecode(resp.body);
         if (mounted) {
@@ -766,7 +767,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
 
     try {
-      final clienteResp = await http.get(
+      final clienteResp = await ApiClient.get(
         Uri.parse('${ApiConfig.baseUrl}/clientes/por-cedula/$cedula'),
       );
 
@@ -790,7 +791,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
           Map<String, dynamic>.from(jsonDecode(clienteResp.body));
 
       final membresiasResp =
-          await http.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
+          await ApiClient.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
 
       List<dynamic> membresiasCliente = [];
       if (membresiasResp.statusCode == 200) {
@@ -1086,7 +1087,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     if (confirmado != true) return;
 
     try {
-      final resp = await http.put(
+      final resp = await ApiClient.put(
         Uri.parse('${ApiConfig.baseUrl}/membresias/${membresia['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -1214,7 +1215,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     if (confirmado != true) return;
 
     try {
-      final resp = await http.delete(
+      final resp = await ApiClient.delete(
         Uri.parse('${ApiConfig.baseUrl}/clientes/por-cedula/$cedula/eliminar-completo'),
         headers: {'accept': 'application/json'},
       );
@@ -1263,9 +1264,9 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
     try {
       final clientesResp =
-          await http.get(Uri.parse('${ApiConfig.baseUrl}/clientes/'));
+          await ApiClient.get(Uri.parse('${ApiConfig.baseUrl}/clientes/'));
       final membresiasResp =
-          await http.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
+          await ApiClient.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
 
       if (clientesResp.statusCode != 200 || membresiasResp.statusCode != 200) {
         if (mounted) {
@@ -1768,7 +1769,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     }
 
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}/usuarios/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -2043,7 +2044,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
           .toList();
 
       for (final membresia in activas) {
-        await http.put(
+        await ApiClient.put(
           Uri.parse('${ApiConfig.baseUrl}/membresias/${membresia['id']}'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
@@ -2064,7 +2065,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             'Membresía creada desde APK por ${widget.session.username}',
       };
 
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}/membresias/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
@@ -2769,7 +2770,7 @@ class _NuevoIngresoPageState extends State<NuevoIngresoPage> {
     });
 
     try {
-      final clienteResp = await http.post(
+      final clienteResp = await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}/clientes/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -2806,7 +2807,7 @@ class _NuevoIngresoPageState extends State<NuevoIngresoPage> {
 
       if (guardarMedidas) {
         final imcValor = _calcImc();
-        final evalResp = await http.post(
+        final evalResp = await ApiClient.post(
           Uri.parse('${ApiConfig.baseUrl}/evaluaciones-fisicas/'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
@@ -2852,7 +2853,7 @@ class _NuevoIngresoPageState extends State<NuevoIngresoPage> {
       }
 
       if (crearUsuario) {
-        final userResp = await http.post(
+        final userResp = await ApiClient.post(
           Uri.parse('${ApiConfig.baseUrl}/usuarios/'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
@@ -3360,7 +3361,7 @@ class _AdminMedidasTabState extends State<AdminMedidasTab> {
     });
 
     try {
-      final resp = await http.get(
+      final resp = await ApiClient.get(
         Uri.parse('${widget.baseUrl}/evaluaciones-fisicas/cliente-cedula/$doc'),
       );
 
@@ -3462,7 +3463,7 @@ class _AdminMedidasTabState extends State<AdminMedidasTab> {
     }
 
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${widget.baseUrl}/evaluaciones-fisicas/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(_buildBody()),
@@ -3495,7 +3496,7 @@ class _AdminMedidasTabState extends State<AdminMedidasTab> {
     }
 
     try {
-      final resp = await http.put(
+      final resp = await ApiClient.put(
         Uri.parse('${widget.baseUrl}/evaluaciones-fisicas/$evaluacionSeleccionadaId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(_buildBody()),
@@ -3850,7 +3851,7 @@ class _AdminRutinasAutoTabState extends State<AdminRutinasAutoTab> {
     }
 
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${widget.baseUrl}/rutinas/asignar-automatica'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -4063,7 +4064,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
   Future<void> _marcarEjercicioCumplido(int clienteRutinaId, int rutinaEjercicioId) async {
     try {
-      final resp = await http.post(
+      final resp = await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}/rutinas/cliente-rutina/$clienteRutinaId/ejercicio/$rutinaEjercicioId/cumplir'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'cumplido': true}),
@@ -4135,13 +4136,13 @@ class _ClientHomePageState extends State<ClientHomePage> {
       final clienteData = jsonDecode(clienteResp.body);
 
       final membresiasResp =
-          await http.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
-      final evaluacionesResp = await http.get(
+          await ApiClient.get(Uri.parse('${ApiConfig.baseUrl}/membresias/'));
+      final evaluacionesResp = await ApiClient.get(
         Uri.parse(
           '${ApiConfig.baseUrl}/evaluaciones-fisicas/?cliente_id=${widget.session.clienteId}',
         ),
       );
-      final rutinaResp = await http.get(
+      final rutinaResp = await ApiClient.get(
         Uri.parse(
           '${ApiConfig.baseUrl}/rutinas/cliente/${widget.session.clienteId}/actual',
         ),
