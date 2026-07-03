@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gimnasio_app/main.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/api_client.dart';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Claves de SharedPreferences
@@ -54,7 +56,7 @@ class AppSettings {
       final backendUrl = await getBackendApiUrl();
       if (backendUrl.isNotEmpty) {
         final uri = Uri.parse('$backendUrl/configuracion/');
-        await http.post(
+        await ApiClient.post(
           uri,
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'clave': clave, 'valor': valor}),
@@ -69,7 +71,7 @@ class AppSettings {
       if (backendUrl.isNotEmpty) {
         // Fetch MAC
         var uri = Uri.parse('$backendUrl/configuracion/scale_mac');
-        var res = await http.get(uri).timeout(const Duration(seconds: 5));
+        var res = await ApiClient.get(uri).timeout(const Duration(seconds: 5));
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           if (data['valor'] != null) {
@@ -80,7 +82,7 @@ class AppSettings {
         
         // Fetch Key
         uri = Uri.parse('$backendUrl/configuracion/scale_key');
-        res = await http.get(uri).timeout(const Duration(seconds: 5));
+        res = await ApiClient.get(uri).timeout(const Duration(seconds: 5));
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           if (data['valor'] != null) {
@@ -187,7 +189,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
     });
 
     try {
-      final resp = await http.get(Uri.parse('$url/')).timeout(const Duration(seconds: 6));
+      final resp = await ApiClient.get(Uri.parse('$url/')).timeout(const Duration(seconds: 6));
       final ok = resp.statusCode >= 200 && resp.statusCode < 400;
       if (mounted) {
         setState(() {
